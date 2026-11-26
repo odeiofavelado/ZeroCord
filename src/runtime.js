@@ -358,8 +358,8 @@
     FM.cfg = Object.assign({ enabled: true, hotkey: true }, cfg || {});
     if (!FM.cfg.enabled && FM.active) Z.fakeMuteToggle(false);
     if (FM.cfg.enabled && !FM.timer) {
-      // the gateway connection can be recreated (reconnect): wrap it again when it changes
-      FM.timer = setInterval(() => { try { wrapSocket(); } catch {} }, 3000);
+      // while active, the gateway connection can be recreated (reconnect): wrap it again when it changes
+      FM.timer = setInterval(() => { if (FM.active) { try { wrapSocket(); } catch {} } }, 3000);
     }
     return Z.fakeMuteState();
   };

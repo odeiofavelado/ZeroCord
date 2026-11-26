@@ -4,6 +4,10 @@ const path = require('path');
 const os = require('os');
 const { execFile, spawn } = require('child_process');
 
+// Electron treats .asar files as folders and reports Discord's app.asar as missing.
+// The installer only needs plain file access.
+process.noAsar = true;
+
 const VARIANTS = [
   { id: 'stable', name: 'Discord', folder: 'Discord', exe: 'Discord.exe' },
   { id: 'ptb', name: 'Discord PTB', folder: 'DiscordPTB', exe: 'DiscordPTB.exe' },
@@ -31,14 +35,28 @@ function compareVersions(a, b) {
   return 0;
 }
 
-function resourcesState(resources) {
-  const index = path.join(resources, 'app', 'index.js');
-  if (exists(index)) {
-    try { const t = fs.readFileSync(index, 'utf8'); if (MARKERS.some((m) => t.includes(m))) return 'installed'; } catch {}
-    return 'other-mod';
+const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
+// Which client mod (if any) is loaded by this resources folder
+function detectMod(resources) {
+  for (const entry of [path.join(resources, 'app', 'index.js'), path.join(resources, 'app.asar', 'index.js')]) {
+    let t = '';
+    try { t = fs.readFileSync(entry, 'utf8'); } catch { continue; }
+    if (MARKERS.some((m) => t.includes(m))) return 'ZeroCord';
+    if (/equicord/i.test(t)) return 'Equicord';
+    if (/vencord/i.test(t)) return 'Vencord';
+    if (/betterdiscord/i.test(t)) return 'BetterDiscord';
+    return 'another mod';
   }
-  if (exists(path.join(resources, '_app.asar'))) return 'other-mod'; // official Vencord / Equicord
-  return 'clean';
+  if (exists(path.join(resources, '_app.asar'))) return 'another mod';
+  return null;
+}
+
+function resourcesState(resources) {
+  const mod = detectMod(resources);
+  if (!mod) return { state: 'clean', mod: null };
+  if (mod === 'ZeroCord') return { state: 'installed', mod };
+  return { state: 'other-mod', mod };
 }
 
 // ---------------------------------------------------------------
@@ -50,13 +68,13 @@ function list() {
     let apps = [];
     try {
       apps = fs.readdirSync(root)
-        .filter((n) => /^app-\d/.test(n) && exists(path.join(root, n, 'resources', 'app.asar')))
+        .filter((n) => /^app-\d/.test(n) && (exists(path.join(root, n, 'resources', 'app.asar')) || exists(path.join(root, n, 'resources', '_app.asar'))))
         .sort(compareVersions);
     } catch {}
     if (!apps.length) continue;
     const latest = apps[apps.length - 1];
-    const state = resourcesState(path.join(root, latest, 'resources'));
-    out.push({ ...v, root, version: latest.replace(/^app-/, ''), apps, state, installed: state === 'installed', otherMod: state === 'other-mod' });
+    const { state, mod } = resourcesState(path.join(root, latest, 'resources'));
+    out.push({ ...v, root, version: latest.replace(/^app-/, ''), apps, state, mod, installed: state === 'installed', otherMod: state === 'other-mod' });
   }
   return out;
 }
@@ -78,6 +96,18 @@ function copyFiles(log) {
   fs.mkdirSync(target, { recursive: true });
   fs.cpSync(SRC_DIR, target, { recursive: true });
   log('ZeroCord files copied');
+}
+
+// Removes an official Vencord/Equicord install, restoring Discord's original app.asar
+function removeOtherMod(resources) {
+  const asar = path.join(resources, 'app.asar');
+  const original = path.join(resources, '_app.asar');
+  if (exists(original)) {
+    if (isDir(asar)) fs.rmSync(asar, { recursive: true, force: true });
+    if (!exists(asar)) fs.renameSync(original, asar);
+  }
+  const appDir = path.join(resources, 'app');
+  if (isDir(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
 }
 
 function injectInto(resources) {
@@ -222,9 +252,13 @@ async function install(ids, options = {}, log = () => {}) {
   } catch {}
 
   for (const v of targets) {
-    if (v.otherMod && !options.force) {
-      log(`⚠ ${v.name}: another client mod is installed (official Vencord/Equicord?). Uninstall it first, ZeroCord already includes Equicord.`);
-      continue;
+    if (v.otherMod) {
+      if (!options.replaceOtherMods) {
+        log(`⚠ ${v.name}: skipped, ${v.mod} is installed there.`);
+        continue;
+      }
+      for (const a of v.apps) removeOtherMod(path.join(v.root, a, 'resources'));
+      log(`${v.name}: ${v.mod} removed (ZeroCord already includes Equicord)`);
     }
     for (const a of v.apps) injectInto(path.join(v.root, a, 'resources'));
     log(`✓ ${v.name} ${v.version}: installed`);

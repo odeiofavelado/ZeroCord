@@ -61,6 +61,8 @@ if (core) {
 // When Discord updates, it creates a new app-x.y.z folder without ZeroCord.
 // Put ZeroCord in it too (when Discord opens and when it closes).
 function reinject() {
+  const previous = process.noAsar;
+  process.noAsar = true; // see app.asar as a plain file, not a folder
   try {
     const root = path.dirname(path.dirname(resources)); // ...\Discord
     const ourIndex = path.join(resources, 'app', 'index.js');
@@ -78,6 +80,8 @@ function reinject() {
     }
   } catch (e) {
     console.error('[ZeroCord] reinject', e);
+  } finally {
+    process.noAsar = previous;
   }
 }
 reinject();

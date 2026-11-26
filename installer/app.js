@@ -51,7 +51,8 @@ installer.onLog(log);
 
 // ---------- Discord clients ----------
 const DISCORD_ICON = '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M19.73 4.87a18.2 18.2 0 0 0-4.6-1.44c-.21.4-.4.8-.58 1.21-1.69-.25-3.4-.25-5.1 0-.18-.41-.37-.82-.59-1.2-1.6.27-3.14.75-4.6 1.43A19.04 19.04 0 0 0 .96 17.7a18.43 18.43 0 0 0 5.63 2.87c.46-.62.86-1.28 1.2-1.98-.65-.25-1.29-.55-1.9-.92.17-.12.32-.24.47-.37 3.58 1.7 7.7 1.7 11.28 0l.46.37c-.6.36-1.25.67-1.9.92.35.7.75 1.35 1.2 1.98 2.03-.63 3.94-1.6 5.64-2.87.47-4.87-.78-9.09-3.3-12.83ZM8.3 15.12c-1.1 0-2-1.02-2-2.27 0-1.24.88-2.26 2-2.26s2.02 1.02 2 2.26c0 1.25-.89 2.27-2 2.27Zm7.4 0c-1.1 0-2-1.02-2-2.27 0-1.24.88-2.26 2-2.26s2.02 1.02 2 2.26c0 1.25-.88 2.27-2 2.27Z"/></svg>';
-const STATE_LABEL = { installed: 'Installed', clean: 'Not installed', 'other-mod': 'Other mod' };
+const STATE_LABEL = { installed: 'Installed', clean: 'Not installed' };
+const stateLabel = (c) => STATE_LABEL[c.state] || (c.mod ? `${c.mod} installed` : 'Other mod');
 let clients = [];
 const selected = new Set();
 let firstLoad = true;
@@ -59,7 +60,7 @@ let firstLoad = true;
 async function load() {
   clients = await installer.list();
   if (firstLoad) {
-    clients.filter((c) => !c.otherMod).forEach((c) => selected.add(c.id));
+    clients.forEach((c) => selected.add(c.id));
     firstLoad = false;
   }
   draw();
@@ -76,13 +77,13 @@ function draw() {
   }
   for (const c of clients) {
     const card = document.createElement('div');
-    card.className = `client ${c.id}` + (selected.has(c.id) ? ' selected' : '') + (c.otherMod ? ' blocked' : '');
+    card.className = `client ${c.id}` + (selected.has(c.id) ? ' selected' : '');
     card.innerHTML = `<span class="check"></span><div class="logo">${DISCORD_ICON}</div>
       <div class="info"><b></b><small></small></div><span class="chip ${c.state}"></span>`;
     card.querySelector('b').textContent = c.name;
     card.querySelector('small').textContent = 'version ' + c.version;
-    card.querySelector('.chip').textContent = STATE_LABEL[c.state] || c.state;
-    if (c.otherMod) card.title = 'This Discord already has another client mod (official Vencord/Equicord). Uninstall it first: ZeroCord already includes Equicord.';
+    card.querySelector('.chip').textContent = stateLabel(c);
+    if (c.otherMod) card.title = `${c.mod} is installed here. ZeroCord can replace it (it already includes Equicord).`;
     card.onclick = () => { selected.has(c.id) ? selected.delete(c.id) : selected.add(c.id); draw(); };
     box.append(card);
   }
@@ -113,11 +114,19 @@ const settle = () => new Promise((ok) => setTimeout(ok, 150)); // let the last l
 $('#install').onclick = async () => {
   const ids = chosen();
   if (!ids.length) return;
+  let replaceOtherMods = false;
+  const others = clients.filter((c) => ids.includes(c.id) && c.otherMod);
+  if (others.length) {
+    const list = others.map((c) => `${c.name} (${c.mod})`).join(', ');
+    const r = await installer.confirm('Replace the existing mod?', `${list} already has a client mod. ZeroCord includes Equicord, so it can replace it. You'll need to turn your plugins back on in the ZeroCord panel.`, ['Replace and install', 'Skip those', 'Cancel']);
+    if (r === 2) return;
+    replaceOtherMods = r === 0;
+  }
   if (!(await closeIfRunning(ids))) return;
   lock(true);
   $('#log').replaceChildren();
   setState('working', 'Hang on, darling… setting everything up for you.');
-  const r = await installer.install(ids, { zeroTwoIcon: $('#opt-icon').checked });
+  const r = await installer.install(ids, { zeroTwoIcon: $('#opt-icon').checked, replaceOtherMods });
   await settle();
   clients = r.list;
   lock(false);

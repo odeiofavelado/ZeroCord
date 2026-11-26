@@ -1,6 +1,17 @@
 // ZeroCord installer (Zero Two edition)
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// Smoke test (used by CI): open the window, record the result and quit
+const SMOKE = process.env.ZEROCORD_SMOKE;
+function smoke(result) {
+  if (!SMOKE) return;
+  try { fs.writeFileSync(SMOKE, JSON.stringify(result, null, 2)); } catch {}
+  app.exit(result.ok ? 0 : 1);
+}
+process.on('uncaughtException', (e) => { console.error(e); smoke({ ok: false, step: 'main', error: String(e && e.stack || e) }); });
+
 const logic = require('./logic');
 
 let win;
@@ -14,6 +25,16 @@ function createWindow() {
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.js') }
   });
   win.once('ready-to-show', () => win.show());
+  if (SMOKE) {
+    win.webContents.on('render-process-gone', (_e, d) => smoke({ ok: false, step: 'renderer', error: d.reason }));
+    win.webContents.on('did-fail-load', (_e, code, desc) => smoke({ ok: false, step: 'load', error: code + ' ' + desc }));
+    win.webContents.on('did-finish-load', () => setTimeout(async () => {
+      try {
+        const ui = await win.webContents.executeJavaScript("({ title: document.title, clients: document.querySelectorAll('.client, .empty').length, installer: typeof window.installer })");
+        smoke({ ok: ui.installer === 'object', step: 'ui', ui, clients: logic.list(), electron: process.versions.electron });
+      } catch (e) { smoke({ ok: false, step: 'ui', error: String(e) }); }
+    }, 2500));
+  }
   win.loadFile(path.join(__dirname, 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
 }

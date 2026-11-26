@@ -13,9 +13,9 @@ jobs:
     name: Build installer
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -24,6 +24,25 @@ jobs:
 
       - name: Build portable installer
         run: npx electron-builder --config installer/electron-builder.json --publish never
+
+      - name: Smoke test (open the installer on Windows)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "dist/installer/win-unpacked" -Filter *.exe | Select-Object -First 1
+          $env:ZEROCORD_SMOKE = "$PWD\smoke.json"
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); Write-Error "Installer did not respond within 60s" }
+          Get-Content smoke.json
+          if ($p.ExitCode -ne 0) { Write-Error "Installer smoke test failed" }
+
+      - name: Startup time of the portable .exe
+        shell: pwsh
+        run: |
+          $env:ZEROCORD_SMOKE = "$PWD\\smoke-portable.json"
+          $t = Measure-Command { Start-Process -FilePath "dist/installer/ZeroCord-Installer.exe" -Wait }
+          "Portable .exe opened and closed in {0:N1}s" -f $t.TotalSeconds
+          Get-Content smoke-portable.json -ErrorAction SilentlyContinue
+          "Size: {0:N0} MB" -f ((Get-Item dist/installer/ZeroCord-Installer.exe).Length / 1MB)
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

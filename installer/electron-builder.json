@@ -8,6 +8,8 @@
   },
   "files": [
     "installer/**",
+    "!installer/splash.bmp",
+    "!installer/electron-builder.json",
     "src/**"
   ],
   "directories": {
@@ -19,6 +21,9 @@
     "artifactName": "ZeroCord-Installer.exe"
   },
   "portable": {
-    "artifactName": "ZeroCord-Installer.exe"
-  }
+    "artifactName": "ZeroCord-Installer.exe",
+    "splashImage": "installer/splash.bmp",
+    "useZip": true
+  },
+  "compression": "normal"
 }

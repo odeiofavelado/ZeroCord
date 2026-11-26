@@ -1,59 +1,110 @@
-<p align="center">
-  <img src="icones/icone-instalador.png" width="120" alt="ZeroCord">
-</p>
+<div align="center">
 
-<h1 align="center">ZeroCord</h1>
-<p align="center">Discord com plugins, temas, sons, perfil personalizado e painel próprio · edição Zero Two</p>
+<img src=".github/assets/logo.png" width="112" alt="ZeroCord logo">
 
----
+# ZeroCord
 
-## O que tem
+**A Discord client mod with 370+ plugins, themes, custom sounds and a built-in control panel.**
 
-- **Mais de 370 plugins** do [Equicord](https://github.com/Equicord/Equicord), com busca e liga/desliga no painel
-- **Painel ✦** no visual do Discord (abre pelo ícone no canto de cima ou com `Ctrl + Shift + M`)
-- **Temas** com prévia, 6 temas prontos e importação de `.css` ou link
-- **Fundo animado** com vídeo, GIF ou imagem
-- **Sons**: troque, ajuste o volume ou silencie qualquer som do Discord
-- **Perfil e badges** personalizados (só você vê)
-- **Mute falso**: na call você aparece mutado e continua falando (`Ctrl + Shift + Q`)
-- **Instala dentro do Discord oficial**: Normal, PTB e Canary, com o ícone da Zero Two
+![Version](https://img.shields.io/badge/version-2.0.0-ff5c8a?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Windows-5865F2?style=flat-square)
+![Discord](https://img.shields.io/badge/Discord-Stable%20%7C%20PTB%20%7C%20Canary-5865F2?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL--3.0-23a55a?style=flat-square)
 
-## Como instalar (Windows)
+<img src=".github/assets/installer.png" width="720" alt="ZeroCord installer">
 
-1. Instale o [Node.js](https://nodejs.org) (versão **LTS**)
-2. Baixe este projeto: botão verde **Code → Download ZIP**, depois extraia
-3. Feche o Discord e dê dois cliques em **`Instalar.bat`**
-4. Marque em quais Discords quer instalar e clique em **Instalar**
+</div>
 
-Na primeira vez o `Instalar.bat` baixa o Electron (uns 100 MB), então demora um pouco.
+## Features
 
-> O Windows pode mostrar o aviso azul "O Windows protegeu o computador", porque o instalador não tem assinatura digital. Clique em **Mais informações → Executar assim mesmo**.
+| | |
+|---|---|
+| **Plugins** | 370+ plugins powered by [Equicord](https://github.com/Equicord/Equicord), with curated packs, search and one-click toggles. Vencord is available as an alternative engine. |
+| **Control panel** | A settings panel styled after Discord's own. Open it from the ✦ icon in the top bar or with `Ctrl` + `Shift` + `M`. |
+| **Themes** | Six built-in themes, live previews, and support for any `.css` theme file or link. |
+| **Animated background** | Use any video, GIF or image as your Discord background, with adjustable intensity and blend modes. |
+| **Custom sounds** | Replace, rebalance or mute any Discord sound individually. |
+| **Profile & badges** | Change your display name, username, avatar and badges locally. Only you see these changes. |
+| **Fake mute** | Appear muted to others in a call while your microphone keeps working. Toggle it with `Ctrl` + `Shift` + `Q`. |
+| **Seamless install** | Installs into the official Discord Stable, PTB and Canary clients and survives Discord updates. |
 
-### Desinstalar
-Abra o `Instalar.bat` de novo e clique em **Desinstalar**. O Discord volta ao normal, com o ícone original.
+<div align="center">
+<img src=".github/assets/panel.png" width="720" alt="ZeroCord control panel">
+</div>
 
-### Usar como app separado (sem mexer no Discord)
-```
+## Installation
+
+> **Requirements:** Windows 10 or 11 and [Node.js](https://nodejs.org) (LTS).
+
+1. Download the project: **Code → Download ZIP**, then extract it.
+2. Close Discord.
+3. Run **`Install.bat`**.
+4. Select the Discord clients you want to install to and click **Install**.
+
+The first run downloads Electron (about 100 MB), so it takes a moment.
+
+> [!NOTE]
+> Windows SmartScreen may warn you because the installer isn't code-signed. Click **More info → Run anyway**.
+
+### Uninstalling
+
+Run `Install.bat` again and click **Uninstall**. Discord goes back to normal, including its original icon. You can choose to keep or delete your settings.
+
+### Running as a standalone app
+
+ZeroCord can also run in its own window without touching your Discord installation:
+
+```bash
 npm install
-node node_modules\electron\install.js
+node node_modules/electron/install.js
 npm start
 ```
 
-## Onde ficam as coisas
+## Usage
 
-| O quê | Onde |
+| Shortcut | Action |
 |---|---|
-| Configurações, temas, sons, perfil e fundo | `%APPDATA%\ZeroCord` |
-| Temas `.css` seus | `%APPDATA%\ZeroCord\temas` |
+| `Ctrl` + `Shift` + `M` | Open the ZeroCord panel |
+| `Ctrl` + `Shift` + `Q` | Toggle fake mute |
 
-## Avisos
+Your settings, themes, sounds and profile files are stored in `%APPDATA%\ZeroCord`. Drop any `.css` file into the `themes` folder there and it's applied instantly.
 
-- Mods de cliente vão contra os termos de uso do Discord. Ban por isso é raro, mas use por sua conta.
-- Se você já usa o Vencord ou o Equicord oficial, desinstale antes: o ZeroCord já inclui o Equicord.
-- Pra plugins e temas funcionarem, o ZeroCord desliga a CSP do Discord (como o Vencord e o Equicord também fazem).
+## Building
 
-## Créditos
+```bash
+npm run build             # standalone portable app   -> dist/app
+npm run build:installer   # portable installer (.exe) -> dist/installer
+```
 
-- Plugins: [Equicord](https://github.com/Equicord/Equicord) e [Vencord](https://github.com/Vendicated/Vencord) (GPL-3.0)
-- Ícones das badges: [merlinfuchs/discord-badges](https://github.com/merlinfuchs/discord-badges) (MIT)
-- Zero Two e cenas: *Darling in the FranXX* (Studio Trigger / CloverWorks). Arte do ícone do instalador por **fantoramu**.
+## Project structure
+
+```
+src/
+├── core.js          Shared core: config, themes, panel IPC, plugin engine
+├── patcher.js       Entry point inside the official Discord client
+├── standalone.js    Entry point for the standalone app
+├── preload.js       Injects the plugin engine before Discord loads
+├── runtime.js       In-page features: background, sounds, profile, fake mute
+├── panel/           The control panel UI
+├── themes/          Built-in themes
+└── vendor/          Bundled Equicord / Vencord builds
+installer/           The installer app
+```
+
+## Disclaimer
+
+Client modifications are against Discord's [Terms of Service](https://discord.com/terms). Bans for using them are rare, but you use ZeroCord at your own risk. Avoid plugins that automate actions or send messages on your behalf.
+
+To make plugins and themes work, ZeroCord disables Discord's Content Security Policy, as Vencord and Equicord do.
+
+## Credits
+
+- [Equicord](https://github.com/Equicord/Equicord) and [Vencord](https://github.com/Vendicated/Vencord): plugin engines (GPL-3.0)
+- [merlinfuchs/discord-badges](https://github.com/merlinfuchs/discord-badges): badge icons (MIT)
+- Zero Two artwork and scenes from *Darling in the FranXX* (Studio Trigger / CloverWorks). Installer icon art by **fantoramu**.
+
+ZeroCord is not affiliated with Discord Inc.
+
+## License
+
+[GPL-3.0](LICENSE)

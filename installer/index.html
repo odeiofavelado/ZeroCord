@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; media-src 'self' file:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>ZeroCord Installer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="state-idle">
+  <!-- Background: animated scenes -->
+  <div id="scenes">
+    <video id="sceneA" muted autoplay loop playsinline></video>
+    <video id="sceneB" muted autoplay loop playsinline></video>
+  </div>
+  <div class="veil"></div>
+  <div class="backdrop-code">002</div>
+
+  <!-- Title bar -->
+  <div class="titlebar">
+    <div class="tag">CODE:002</div>
+    <span>ZeroCord Installer</span>
+    <div class="spacer"></div>
+    <button class="wb" data-action="minimize" title="Minimize">
+      <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="5.5" width="10" height="1.2" rx=".6" fill="currentColor"/></svg>
+    </button>
+    <button class="wb close" data-action="close" title="Close">
+      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- Zero Two -->
+  <div id="stage">
+    <div id="bubble">Ready when you are, darling.</div>
+    <img id="zero-two" src="media/zero-two-smile.webp" alt="">
+  </div>
+
+  <!-- Panel -->
+  <main id="panel">
+    <div class="brand">
+      <div class="app-icon">
+        <span class="horn left"></span><span class="horn right"></span>
+        <img src="../src/icons/installer.png" alt="">
+      </div>
+      <div>
+        <h1>ZeroCord</h1>
+        <p>Installer · Zero Two Edition</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">Install to</div>
+      <div id="clients"></div>
+    </div>
+
+    <div class="options">
+      <label class="option">
+        <input type="checkbox" id="opt-icon" checked>
+        <span class="box"></span>
+        <img src="../src/icons/discord.png" alt="" class="mini">
+        <span>Replace the Discord icon with Zero Two</span>
+      </label>
+      <label class="option">
+        <input type="checkbox" id="opt-launch" checked>
+        <span class="box"></span>
+        <span>Launch Discord when finished</span>
+      </label>
+    </div>
+
+    <div class="buttons">
+      <button id="install" class="primary"><span>Install</span></button>
+      <button id="uninstall" class="secondary">Uninstall</button>
+      <button id="data" class="link">Open settings folder</button>
+    </div>
+
+    <div class="progress"><div></div></div>
+    <div id="log"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

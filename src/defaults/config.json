@@ -1,0 +1,33 @@
+{
+  "hardwareAcceleration": true,
+  "blockTelemetry": true,
+  "noAnimations": true,
+  "spellcheck": false,
+  "zoom": 1.0,
+  "backgroundThrottling": true,
+  "plugins": true,
+  "mod": "equicord",
+  "panelButton": true,
+  "background": true,
+  "backgroundOpacity": 0.25,
+  "backgroundBlend": "screen",
+  "onlineThemes": [],
+  "activeThemes": {},
+  "sounds": {},
+  "soundsGlobal": {
+    "volume": 1,
+    "muted": false
+  },
+  "profile": {
+    "enabled": false,
+    "displayName": "",
+    "username": "",
+    "avatar": "",
+    "badges": []
+  },
+  "fakeMute": {
+    "enabled": true,
+    "hotkey": true
+  },
+  "zeroTwoIcon": true
+}

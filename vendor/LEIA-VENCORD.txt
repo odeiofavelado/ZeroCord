@@ -1,3 +1,0 @@
-Vencord - https://github.com/Vendicated/Vencord
-Licenca: GPL-3.0. Este arquivo e o build oficial "Vencord.user.js" sem modificacoes.
-O MeuDiscord baixa a versao mais nova automaticamente a cada inicio.

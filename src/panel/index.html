@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: zerocord: https:; media-src 'self' data: zerocord: https:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>ZeroCord Panel</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-scroll">
+      <nav>
+        <div class="cat">ZeroCord</div>
+        <button data-tab="themes" class="active">Themes &amp; Background</button>
+        <button data-tab="sounds">Sounds</button>
+        <button data-tab="profile">Profile &amp; Badges</button>
+        <div class="sep"></div>
+        <div class="cat">Plugins</div>
+        <button data-tab="plugins">Plugins</button>
+        <button data-tab="mute">Fake Mute</button>
+        <button data-tab="css">Custom CSS</button>
+        <div class="sep"></div>
+        <div class="cat">App</div>
+        <button data-tab="settings">Settings</button>
+        <div class="sep"></div>
+        <div class="footer">ZeroCord 2.0<br>Ctrl+Shift+M opens this panel</div>
+      </nav>
+    </div>
+  </aside>
+
+  <main>
+    <div class="close"><button id="close" title="Close (Esc)">✕</button><span>ESC</span></div>
+
+    <!-- ===================== THEMES ===================== -->
+    <section id="tab-themes" class="tab active">
+      <header>
+        <h1>Themes &amp; Background</h1>
+        <p>Toggle any theme and preview it before you commit. Changes apply instantly.</p>
+      </header>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <h2>Animated background</h2>
+            <p class="sub" id="bg-file">—</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="bg-enabled"><span></span></label>
+        </div>
+        <div class="grid2">
+          <label>Intensity <b id="bg-opacity-value"></b>
+            <input type="range" id="bg-opacity" min="0.05" max="1" step="0.01">
+          </label>
+          <label>Blend mode
+            <select id="bg-blend">
+              <option value="screen">Screen (keeps text readable)</option>
+              <option value="normal">Normal (transparent overlay)</option>
+              <option value="overlay">Overlay (more contrast)</option>
+              <option value="soft-light">Soft light</option>
+              <option value="lighten">Lighten</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions"><button id="bg-pick">Change video, GIF or image…</button></div>
+      </div>
+
+      <div class="bar">
+        <button id="theme-import">Import theme (.css)</button>
+        <input id="theme-link" placeholder="or paste a theme link (https://…css)">
+        <button id="theme-link-add">Add link</button>
+        <button class="ghost" data-folder="themes">Open folder</button>
+      </div>
+      <div id="theme-list" class="theme-grid"></div>
+      <p class="hint">Looking for more? Download any <code>.theme.css</code> from betterdiscord.app/themes and import it here.</p>
+    </section>
+
+    <!-- ===================== SOUNDS ===================== -->
+    <section id="tab-sounds" class="tab">
+      <header>
+        <h1>Sounds</h1>
+        <p>Replace, adjust or mute any Discord sound.</p>
+      </header>
+      <div class="card">
+        <div class="row">
+          <div><h2>All sounds</h2><p class="sub">Master volume for notification and call sounds</p></div>
+          <label class="switch"><input type="checkbox" id="sounds-on"><span></span></label>
+        </div>
+        <label>Master volume <b id="sounds-volume-value"></b><input type="range" id="sounds-volume" min="0" max="1" step="0.01"></label>
+      </div>
+      <div class="bar">
+        <input id="sounds-search" placeholder="Search sounds…">
+        <button class="ghost" id="sounds-refresh">Refresh list</button>
+        <button class="ghost" data-folder="sounds">Open sounds folder</button>
+      </div>
+      <div id="sounds-note" class="hint"></div>
+      <div id="sound-list" class="list"></div>
+    </section>
+
+    <!-- ===================== PROFILE ===================== -->
+    <section id="tab-profile" class="tab">
+      <header>
+        <h1>Profile &amp; Badges</h1>
+        <p><b>Only you can see these changes.</b> Nobody else on Discord sees them.</p>
+      </header>
+      <div class="card">
+        <div class="row">
+          <div><h2>Customize my profile</h2><p class="sub">Turns everything on this page on or off</p></div>
+          <label class="switch"><input type="checkbox" id="profile-enabled"><span></span></label>
+        </div>
+        <div class="grid2">
+          <label>Display name<input id="profile-name" placeholder="Leave empty to keep yours"></label>
+          <label>Username<input id="profile-username" placeholder="Leave empty to keep yours"></label>
+        </div>
+        <div class="avatar-row">
+          <img id="profile-avatar-img" alt="">
+          <div>
+            <h3>Avatar</h3>
+            <div class="actions">
+              <button id="profile-avatar-pick">Choose image or GIF…</button>
+              <button class="ghost" id="profile-avatar-reset">Use my original</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Badges</h2>
+        <p class="sub">Click to add or remove. They show up when you open your profile.</p>
+        <div id="badge-presets" class="badges"></div>
+        <h3>My badges</h3>
+        <div id="badge-mine" class="badges"></div>
+        <div class="bar">
+          <input id="badge-name" placeholder="Badge name (shown on hover)">
+          <button id="badge-add">Add badge with my own image…</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PLUGINS ===================== -->
+    <section id="tab-plugins" class="tab">
+      <header>
+        <h1>Plugins</h1>
+        <p>Curated packs and the full plugin list. Click <b>Apply</b> after making changes.</p>
+      </header>
+      <div id="plugins-note" class="hint"></div>
+      <div class="subtabs">
+        <button class="active" data-sub="packs">Curated packs</button>
+        <button data-sub="all">All plugins <span id="plugins-total"></span></button>
+      </div>
+      <div id="packs"></div>
+      <div id="all" class="hidden">
+        <div class="bar">
+          <input id="plugins-search" placeholder="Search by name or description…">
+          <select id="plugins-filter">
+            <option value="all">All</option>
+            <option value="on">Enabled</option>
+            <option value="off">Disabled</option>
+          </select>
+        </div>
+        <div id="plugin-list" class="plugin-grid"></div>
+      </div>
+      <div class="bar sticky">
+        <button id="plugins-apply">Apply (reload Discord)</button>
+        <span class="sub">Each plugin has its own options under Settings → Plugins inside Discord.</span>
+      </div>
+    </section>
+
+    <!-- ===================== FAKE MUTE ===================== -->
+    <section id="tab-mute" class="tab">
+      <header>
+        <h1>Fake Mute</h1>
+        <p>People in the call see you as muted, while your microphone keeps working.</p>
+      </header>
+      <div class="card mute-card">
+        <div class="mute-state">
+          <div id="mute-dot" class="dot"></div>
+          <div>
+            <h2 id="mute-title">Off</h2>
+            <p class="sub" id="mute-sub">Your real state is shown.</p>
+          </div>
+        </div>
+        <button id="mute-toggle" class="big">Turn on</button>
+      </div>
+      <div class="card settings-list">
+        <div class="row">
+          <div><b>Enable</b><p class="sub">When disabled, nothing here works and the shortcut is freed</p></div>
+          <label class="switch"><input type="checkbox" id="mute-enabled"><span></span></label>
+        </div>
+        <div class="row">
+          <div><b>Shortcut: Ctrl + Shift + Q</b><p class="sub">Toggle it straight from Discord</p></div>
+          <label class="switch"><input type="checkbox" id="mute-hotkey"><span></span></label>
+        </div>
+      </div>
+      <p class="hint">While it's on, the ✦ icon at the top turns red. It turns itself off when Discord closes.</p>
+    </section>
+
+    <!-- ===================== CSS ===================== -->
+    <section id="tab-css" class="tab">
+      <header>
+        <h1>Custom CSS</h1>
+        <p>Change anything in Discord's look. Save to apply.</p>
+      </header>
+      <textarea id="css-text" spellcheck="false"></textarea>
+      <div class="bar">
+        <button id="css-save">Save &amp; apply (Ctrl+S)</button>
+        <span id="css-status" class="sub"></span>
+      </div>
+      <details class="card">
+        <summary>Snippets</summary>
+<pre>/* Rounder avatars */
+[class*="avatar"] img { border-radius: 30% !important; }
+
+/* Different font */
+body { --font-primary: "Segoe UI", sans-serif; }
+
+/* Hide the gift (Nitro) button in the message box */
+button[aria-label*="gift" i] { display: none !important; }
+
+/* Hide scrollbars */
+::-webkit-scrollbar { width: 0 !important; }</pre>
+      </details>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section id="tab-settings" class="tab">
+      <header>
+        <h1>Settings</h1>
+        <p>Performance and app behavior.</p>
+      </header>
+      <div class="card settings-list" id="settings"></div>
+      <div class="card">
+        <label>Plugin engine ↻
+          <select id="mod">
+            <option value="equicord">Equicord (370+ plugins, recommended)</option>
+            <option value="vencord">Vencord (~180 plugins, most stable)</option>
+          </select>
+        </label>
+      </div>
+      <div class="card">
+        <label>Interface zoom <b id="zoom-value"></b><input type="range" id="zoom" min="0.6" max="1.5" step="0.05"></label>
+      </div>
+      <div class="bar">
+        <button id="restart">Restart ZeroCord</button>
+        <button class="ghost" data-folder="data">Open data folder</button>
+      </div>
+      <p class="hint">Options marked ↻ take effect after a restart.</p>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="row"><h2 id="modal-title">Preview</h2><button class="ghost" id="modal-close">Close</button></div>
+      <img id="modal-img" alt="">
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="panel.js"></script>
+</body>
+</html>

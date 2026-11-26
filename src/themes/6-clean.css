@@ -1,0 +1,10 @@
+/**
+ * @name Clean (no ads)
+ * @description Hides Nitro, Shop, Quests and gift buttons. Works with any other theme.
+ */
+a[href="/store"], a[href="/shop"], a[href="/quest-home"], a[href*="/discovery/quests"],
+li:has(> div > a[href="/store"]), li:has(> div > a[href="/shop"]), li:has(a[href="/quest-home"]),
+button[aria-label*="gift" i], button[aria-label*="presente" i],
+[class*="nitroBadge"], [class*="premiumPromo"], [class*="upsell" i] {
+  display: none !important;
+}

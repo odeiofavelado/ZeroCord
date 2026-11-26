@@ -1,0 +1,20 @@
+{
+  "appId": "app.zerocord.installer",
+  "productName": "ZeroCord Installer",
+  "asar": false,
+  "extraMetadata": {
+    "main": "installer/main.js",
+    "name": "zerocord-installer"
+  },
+  "files": [
+    "installer/**",
+    "src/**"
+  ],
+  "directories": {
+    "output": "dist/installer"
+  },
+  "win": {
+    "target": "portable",
+    "icon": "src/icons/installer.ico"
+  }
+}

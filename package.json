@@ -2,40 +2,36 @@
   "name": "zerocord",
   "productName": "ZeroCord",
   "version": "2.0.0",
-  "description": "ZeroCord: Discord com plugins, temas, sons e painel",
-  "main": "main.js",
+  "description": "A Discord client mod with 370+ plugins, themes, custom sounds and a built-in control panel.",
+  "license": "GPL-3.0-or-later",
+  "author": "odeiofavelado",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odeiofavelado/ZeroCord.git"
+  },
+  "main": "src/standalone.js",
   "scripts": {
     "start": "electron .",
+    "installer": "electron installer/main.js",
     "build": "electron-builder --win portable",
-    "instalador": "electron instalador/main.js",
-    "build-instalador": "electron-builder --config instalador/builder.json"
+    "build:installer": "electron-builder --config installer/electron-builder.json"
   },
   "devDependencies": {
     "electron": "latest",
     "electron-builder": "latest"
   },
   "build": {
-    "appId": "local.zerocord",
+    "appId": "app.zerocord",
     "productName": "ZeroCord",
     "files": [
-      "main.js",
-      "nucleo.js",
-      "patcher.js",
-      "preload.js",
-      "runtime.js",
-      "painel-preload.js",
-      "painel/**",
-      "temas-embutidos/**",
-      "badges/**",
-      "icones/**",
-      "config.json",
-      "estilo.css",
-      "personalizado.css",
-      "vendor/**"
+      "src/**"
     ],
+    "directories": {
+      "output": "dist/app"
+    },
     "win": {
       "target": "portable",
-      "icon": "icones/icone-instalador.ico"
+      "icon": "src/icons/discord.ico"
     }
   }
 }

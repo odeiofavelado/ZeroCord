@@ -34,21 +34,25 @@
 
 ## Installation
 
-> **Requirements:** Windows 10 or 11 and [Node.js](https://nodejs.org) (LTS).
-
-1. Download the project: **Code → Download ZIP**, then extract it.
+1. Download **[ZeroCord-Installer.exe](https://github.com/odeiofavelado/ZeroCord/releases/latest/download/ZeroCord-Installer.exe)** from the [latest release](https://github.com/odeiofavelado/ZeroCord/releases/latest).
 2. Close Discord.
-3. Run **`Install.bat`**.
-4. Select the Discord clients you want to install to and click **Install**.
+3. Run `ZeroCord-Installer.exe`, select your Discord clients and click **Install**.
 
-The first run downloads Electron (about 100 MB), so it takes a moment.
+No Node.js or setup required. Works on Windows 10 and 11.
 
 > [!NOTE]
 > Windows SmartScreen may warn you because the installer isn't code-signed. Click **More info → Run anyway**.
 
+<details>
+<summary><b>Install from source</b></summary>
+
+Requires [Node.js](https://nodejs.org) (LTS). Download the source (**Code → Download ZIP**), extract it and run **`Install.bat`**.
+
+</details>
+
 ### Uninstalling
 
-Run `Install.bat` again and click **Uninstall**. Discord goes back to normal, including its original icon. You can choose to keep or delete your settings.
+Run the installer again and click **Uninstall**. Discord goes back to normal, including its original icon. You can choose to keep or delete your settings.
 
 ### Running as a standalone app
 
@@ -75,6 +79,8 @@ Your settings, themes, sounds and profile files are stored in `%APPDATA%\ZeroCor
 npm run build             # standalone portable app   -> dist/app
 npm run build:installer   # portable installer (.exe) -> dist/installer
 ```
+
+Pushing a `v*` tag builds the installer on GitHub Actions and publishes it as a release.
 
 ## Project structure
 

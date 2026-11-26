@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build portable installer
+        run: npx electron-builder --config installer/electron-builder.json --publish never
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v2.0.0' }}
+          name: ZeroCord ${{ github.ref_type == 'tag' && github.ref_name || 'v2.0.0' }}
+          files: dist/installer/ZeroCord-Installer.exe
+          body: |
+            ## Download
+
+            **[ZeroCord-Installer.exe](https://github.com/${{ github.repository }}/releases/latest/download/ZeroCord-Installer.exe)** — no Node.js or setup required.
+
+            1. Close Discord.
+            2. Run `ZeroCord-Installer.exe`.
+            3. Select your Discord clients (Stable, PTB, Canary) and click **Install**.
+
+            > Windows SmartScreen may show a warning because the installer isn't code-signed. Click **More info → Run anyway**.
+
+            Run the installer again at any time to reinstall or uninstall.

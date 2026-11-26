@@ -15,6 +15,10 @@
   },
   "win": {
     "target": "portable",
-    "icon": "src/icons/installer.ico"
+    "icon": "src/icons/installer.ico",
+    "artifactName": "ZeroCord-Installer.exe"
+  },
+  "portable": {
+    "artifactName": "ZeroCord-Installer.exe"
   }
 }

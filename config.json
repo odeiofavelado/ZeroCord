@@ -1,0 +1,28 @@
+{
+  "aceleracaoHardware": true,
+  "bloquearTelemetria": true,
+  "semAnimacoes": true,
+  "corretorOrtografico": false,
+  "zoom": 1.0,
+  "economizarEmSegundoPlano": true,
+  "fundo": true,
+  "fundoOpacidade": 0.25,
+  "fundoMistura": "screen",
+  "plugins": true,
+  "temasOnline": [],
+  "botaoPainel": true,
+  "temasAtivos": {},
+  "sons": {},
+  "sonsGeral": {
+    "volume": 1,
+    "mudo": false
+  },
+  "perfil": {
+    "ativo": false,
+    "nomeExibicao": "",
+    "usuario": "",
+    "avatar": "",
+    "badges": []
+  },
+  "iconeZeroTwo": true
+}

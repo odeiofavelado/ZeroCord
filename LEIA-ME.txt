@@ -1,0 +1,92 @@
+ZEROCORD 2.0
+===============
+
+Um app seu que abre o Discord oficial numa janela própria, com Equicord (373 plugins), temas,
+sons, fundo animado e perfil personalizado.
+
+ABRIR
+-----
+  Na pasta do projeto: npm start   (ou dois cliques num Abrir.bat com "npm start" dentro)
+  Primeira vez: npm install  e depois  node node_modules\electron\install.js
+
+INSTALAR DENTRO DO DISCORD OFICIAL (Normal, PTB e Canary)
+---------------------------------------------------------
+  1. Dois cliques em  Instalar.bat   (ou: npm run instalador)
+  2. Marque em quais Discords quer instalar e clique em Instalar.
+     - "Trocar o ícone do Discord pela Zero Two" muda o ícone da janela e dos atalhos.
+  3. O Discord abre já com plugins (Equicord), temas, sons, perfil, fundo e o painel ✦.
+
+  Desinstalar: abra o instalador de novo e clique em Desinstalar (o ícone original volta).
+  Se você já usa o Vencord/Equicord oficial, desinstale ele antes (o ZeroCord já inclui o Equicord).
+  Quando o Discord se atualizar, o ZeroCord se coloca na versão nova sozinho. Se um dia
+  sumir depois de uma atualização, é só abrir o instalador e clicar em Reinstalar.
+
+  Suas configurações (dentro do Discord) ficam em: %APPDATA%\ZeroCord
+  Gerar o instalador como .exe: npm run build-instalador  (sai na pasta dist-instalador)
+
+O PAINEL (o coração de tudo)
+----------------------------
+Abra pelo botão ✦ no canto de cima do Discord, ou com Ctrl+Shift+M.
+
+  🎨 Temas e fundo
+     - Liga/desliga cada tema com um clique e vê a PRÉVIA (foto do seu Discord com o tema)
+     - 6 temas embutidos: Vidro, AMOLED, Roxo Neon, Sakura, Oceano, Limpo (sem propagandas)
+     - Importa .css (betterdiscord.app/themes) ou cola o link de um tema
+     - Fundo animado: liga/desliga, força, modo e troca de vídeo/GIF/imagem
+
+  🔊 Sons
+     - Lista os sons do Discord (mensagem, mutar, entrar na call, chamada...)
+     - Trocar por qualquer áudio seu, volume individual, silenciar, ouvir antes
+     - Volume geral e "silenciar todos"
+
+  🪪 Perfil e badges  (SÓ VOCÊ VÊ)
+     - Nome de exibição, @, foto de perfil (aceita GIF)
+     - Badges oficiais (Nitro, HypeSquad, Impulso, Dev...) e badges com imagem sua
+
+  💎 Nitro e plugins
+     - Aba "Todos os plugins": TODOS os plugins do Equicord com busca e liga/desliga
+     - Em Ajustes dá pra trocar Equicord (mais plugins) por Vencord (mais estável)
+     - Pacotes prontos: Nitro grátis (FakeNitro), Efeitos de perfil, Essenciais,
+       Privacidade, Voz e música, Diversão. Depois clique em "Aplicar".
+
+  🔇 Mute falso
+     - Na call você aparece mutado, mas continua falando. Ctrl+Shift+Q liga/desliga.
+     - Quando ligado, o ícone ✦ fica vermelho. Desliga sozinho quando o Discord fecha.
+
+  ✏️ CSS livre   - edite e salve, aplica na hora
+  ⚙️ Ajustes     - desempenho, zoom, botão do painel, reiniciar
+
+O QUE OS OUTROS VEEM (sendo honesto)
+------------------------------------
+  - Perfil, @, foto e badges da aba Perfil: só você vê.
+  - FakeNitro: os outros veem seus emojis/figurinhas como link ou imagem.
+  - Cores de perfil (FakeProfileThemes) e decorações (Decor): só quem também usa Vencord vê.
+  - Efeitos de perfil do Nitro de verdade, pra todo mundo ver, só pagando o Nitro.
+    Nenhum mod consegue fazer o servidor do Discord mostrar isso pros outros.
+
+PASTAS
+------
+  temas\     seus temas .css (ligam sozinhos quando você coloca)
+  sons\      os sons que você escolheu no painel
+  perfil\    sua foto e badges personalizadas
+  fundo.*    o seu fundo animado
+
+ATALHOS
+-------
+  Ctrl+Shift+Q  mute falso      Ctrl+Shift+M  painel      Ctrl+R  recarregar      F12  ferramentas de desenvolvedor
+
+LIMITAÇÕES
+----------
+  - Compartilhar tela transmite a tela inteira.
+  - Sem "pressionar para falar" em segundo plano e sem detecção de jogos (limite da versão web).
+  - A aba "Themes" do Vencord não funciona aqui: use a aba Temas do painel.
+  - Se o Discord mudar algo por dentro, alguma função pode parar até o Vencord atualizar.
+
+AVISO
+-----
+  Mods vão contra os termos do Discord. Ban por usar Vencord é muito raro, mas evite
+  plugins que automatizam coisas ou mandam mensagens sozinhos.
+
+ATALHO SEM INSTALAR
+-------------------
+  DiscordLeve.bat abre o Discord numa janela do Edge (bem leve, sem plugins/painel).

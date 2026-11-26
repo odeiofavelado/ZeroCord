@@ -1,0 +1,41 @@
+{
+  "name": "zerocord",
+  "productName": "ZeroCord",
+  "version": "2.0.0",
+  "description": "ZeroCord: Discord com plugins, temas, sons e painel",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "instalador": "electron instalador/main.js",
+    "build-instalador": "electron-builder --config instalador/builder.json"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "local.zerocord",
+    "productName": "ZeroCord",
+    "files": [
+      "main.js",
+      "nucleo.js",
+      "patcher.js",
+      "preload.js",
+      "runtime.js",
+      "painel-preload.js",
+      "painel/**",
+      "temas-embutidos/**",
+      "badges/**",
+      "icones/**",
+      "config.json",
+      "estilo.css",
+      "personalizado.css",
+      "vendor/**"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icones/icone-instalador.ico"
+    }
+  }
+}

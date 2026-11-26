@@ -1,0 +1,30 @@
+/**
+ * @name Sakura
+ * @description Rosa e lilás suaves, combina com o seu fundo.
+ */
+:root, .theme-dark, .theme-darker, .theme-midnight, .visual-refresh, .visual-refresh.theme-dark {
+  --background-base-lowest: #160f17 !important;
+  --background-base-lower: #1d141f !important;
+  --background-base-low: #251a28 !important;
+  --background-surface-high: #312235 !important;
+  --background-surface-higher: #3b2a40 !important;
+  --background-surface-highest: #3b2a40 !important;
+  --background-tertiary: #160f17 !important;
+  --background-secondary: #1d141f !important;
+  --background-secondary-alt: #251a28 !important;
+  --background-primary: #251a28 !important;
+  --background-floating: #312235 !important;
+  --modal-background: #251a28 !important;
+  --modal-footer-background: #1d141f !important;
+  --channeltextarea-background: #312235 !important;
+  --input-background: #312235 !important;
+  --chat-background: #251a28 !important;
+  --brand-500: #f472b6 !important;
+  --brand-560: #ec4899 !important;
+  --brand-experiment: #f472b6 !important;
+  --brand-experiment-560: #ec4899 !important;
+  --button-filled-brand-background: #f472b6 !important;
+  --button-filled-brand-background-hover: #ec4899 !important;
+  --text-link: #f472b6 !important;
+  --control-brand-foreground: #f472b6 !important;
+}

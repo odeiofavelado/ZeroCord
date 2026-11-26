@@ -1,0 +1,30 @@
+/**
+ * @name Oceano
+ * @description Azul profundo com detalhes ciano.
+ */
+:root, .theme-dark, .theme-darker, .theme-midnight, .visual-refresh, .visual-refresh.theme-dark {
+  --background-base-lowest: #06101a !important;
+  --background-base-lower: #0a1724 !important;
+  --background-base-low: #0e1e2f !important;
+  --background-surface-high: #142a40 !important;
+  --background-surface-higher: #1a344e !important;
+  --background-surface-highest: #1a344e !important;
+  --background-tertiary: #06101a !important;
+  --background-secondary: #0a1724 !important;
+  --background-secondary-alt: #0e1e2f !important;
+  --background-primary: #0e1e2f !important;
+  --background-floating: #142a40 !important;
+  --modal-background: #0e1e2f !important;
+  --modal-footer-background: #0a1724 !important;
+  --channeltextarea-background: #142a40 !important;
+  --input-background: #142a40 !important;
+  --chat-background: #0e1e2f !important;
+  --brand-500: #22d3ee !important;
+  --brand-560: #06b6d4 !important;
+  --brand-experiment: #22d3ee !important;
+  --brand-experiment-560: #06b6d4 !important;
+  --button-filled-brand-background: #22d3ee !important;
+  --button-filled-brand-background-hover: #06b6d4 !important;
+  --text-link: #22d3ee !important;
+  --control-brand-foreground: #22d3ee !important;
+}

@@ -1,0 +1,31 @@
+/**
+ * @name Roxo Neon
+ * @description Roxo escuro com detalhes magenta brilhantes.
+ */
+:root, .theme-dark, .theme-darker, .theme-midnight, .visual-refresh, .visual-refresh.theme-dark {
+  --background-base-lowest: #0c0614 !important;
+  --background-base-lower: #130a1f !important;
+  --background-base-low: #190e29 !important;
+  --background-surface-high: #24133a !important;
+  --background-surface-higher: #2e1a49 !important;
+  --background-surface-highest: #2e1a49 !important;
+  --background-tertiary: #0c0614 !important;
+  --background-secondary: #130a1f !important;
+  --background-secondary-alt: #190e29 !important;
+  --background-primary: #190e29 !important;
+  --background-floating: #24133a !important;
+  --modal-background: #190e29 !important;
+  --modal-footer-background: #130a1f !important;
+  --channeltextarea-background: #24133a !important;
+  --input-background: #24133a !important;
+  --chat-background: #190e29 !important;
+  --brand-500: #d946ef !important;
+  --brand-560: #c026d3 !important;
+  --brand-experiment: #d946ef !important;
+  --brand-experiment-560: #c026d3 !important;
+  --button-filled-brand-background: #d946ef !important;
+  --button-filled-brand-background-hover: #c026d3 !important;
+  --text-link: #d946ef !important;
+  --control-brand-foreground: #d946ef !important;
+}
+a, [class*="anchor"] { text-shadow: 0 0 6px #d946ef55; }

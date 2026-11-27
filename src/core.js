@@ -430,8 +430,10 @@ function listBadgePresets() {
 }
 
 // Everything the in-Discord settings need
+const VERSION = (() => { try { return require('../package.json').version; } catch { return ''; } })() + '+' + fileVersion(path.join(__dirname, 'runtime.js'));
 function pageState() {
   return {
+    version: VERSION,
     config: {
       background: !!config.background, backgroundOpacity: config.backgroundOpacity, backgroundBlend: config.backgroundBlend,
       noAnimations: !!config.noAnimations, blockTelemetry: !!config.blockTelemetry, zoom: config.zoom,

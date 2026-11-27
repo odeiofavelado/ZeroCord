@@ -569,6 +569,15 @@
   Z.setupEngine = (initialState) => {
     setState(initialState);
     brandSettings();
-    return registerPlugins();
+    const ok = registerPlugins();
+    // Confirms ZeroCord is running, once per installed version
+    try {
+      const version = (initialState && initialState.version) || '';
+      if (localStorage.getItem('zerocord:loaded') !== version) {
+        localStorage.setItem('zerocord:loaded', version);
+        setTimeout(() => toast('ZeroCord loaded ✓  Settings → ZeroCord Settings → Plugins', false), 1500);
+      }
+    } catch {}
+    return ok;
   };
 })();

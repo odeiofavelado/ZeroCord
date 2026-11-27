@@ -126,9 +126,13 @@ $('#install').onclick = async () => {
   lock(false);
   draw();
   const done = ids.filter((id) => clients.find((c) => c.id === id && c.installed));
-  if (r.ok && done.length) {
+  const failed = ids.length - done.length;
+  if (r.ok && done.length && !failed) {
     setState('done', 'All done! Your Discord now has plugins, themes and the ✦ panel.');
     log('✓ Finished. Open Discord and look for the ✦ icon at the top.');
+    if ($('#opt-launch').checked) installer.launch(done);
+  } else if (done.length) {
+    setState('done', 'Almost there! Some of them need another try, check the log below.');
     if ($('#opt-launch').checked) installer.launch(done);
   } else {
     setState('idle', 'Hmm… something went wrong. Check the log below.');

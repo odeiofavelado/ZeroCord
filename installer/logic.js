@@ -252,6 +252,14 @@ ie4uinit.exe -show
   log(useOurs ? `Zero Two icon applied to ${changes.length} shortcut(s)` : `Original Discord icon restored on ${changes.length} shortcut(s)`);
 }
 
+function friendlyError(e) {
+  if (['EBUSY', 'EPERM', 'EACCES'].includes(e && e.code)) {
+    return "Discord's files are in use by another program. Fully quit any app that may be using them " +
+      '(other Electron apps, an antivirus scan) or restart your PC, then try again.';
+  }
+  return String((e && e.message) || e);
+}
+
 // ---------------------------------------------------------------
 async function install(ids, options = {}, log = () => {}) {
   const targets = list().filter((v) => ids.includes(v.id));
@@ -269,16 +277,20 @@ async function install(ids, options = {}, log = () => {}) {
   } catch {}
 
   for (const v of targets) {
-    if (v.otherMod) {
-      if (!options.replaceOtherMods) {
-        log(`⚠ ${v.name}: skipped, ${v.mod} is installed there.`);
-        continue;
+    try {
+      if (v.otherMod) {
+        if (!options.replaceOtherMods) {
+          log(`⚠ ${v.name}: skipped, ${v.mod} is installed there.`);
+          continue;
+        }
+        for (const a of v.apps) removeOtherMod(path.join(v.root, a, 'resources'));
+        log(`${v.name}: ${v.mod} removed (ZeroCord already includes Equicord)`);
       }
-      for (const a of v.apps) removeOtherMod(path.join(v.root, a, 'resources'));
-      log(`${v.name}: ${v.mod} removed (ZeroCord already includes Equicord)`);
+      for (const a of v.apps) injectInto(path.join(v.root, a, 'resources'));
+      log(`✓ ${v.name} ${v.version}: installed`);
+    } catch (e) {
+      log(`✗ ${v.name}: ${friendlyError(e)}`);
     }
-    for (const a of v.apps) injectInto(path.join(v.root, a, 'resources'));
-    log(`✓ ${v.name} ${v.version}: installed`);
   }
   await setShortcutIcons(targets, options.zeroTwoIcon !== false, log);
   return list();
@@ -287,9 +299,13 @@ async function install(ids, options = {}, log = () => {}) {
 async function uninstall(ids, options = {}, log = () => {}) {
   const targets = list().filter((v) => ids.includes(v.id));
   for (const v of targets) {
-    let n = 0;
-    for (const a of v.apps) if (removeFrom(path.join(v.root, a, 'resources'))) n++;
-    log(n ? `✓ ${v.name}: ZeroCord removed` : `${v.name}: was not installed`);
+    try {
+      let n = 0;
+      for (const a of v.apps) if (removeFrom(path.join(v.root, a, 'resources'))) n++;
+      log(n ? `✓ ${v.name}: ZeroCord removed` : `${v.name}: was not installed`);
+    } catch (e) {
+      log(`✗ ${v.name}: ${friendlyError(e)}`);
+    }
   }
   await setShortcutIcons(targets, false, log);
   if (options.deleteData && !list().some((v) => v.installed)) {

@@ -36,7 +36,6 @@ document.querySelectorAll('nav button[data-tab]').forEach((b) => {
     if (b.dataset.tab === 'sounds') loadSounds();
     if (b.dataset.tab === 'plugins') loadPlugins();
     if (b.dataset.tab === 'css') loadCss();
-    if (b.dataset.tab === 'mute') loadMute();
   };
 });
 document.querySelectorAll('[data-folder]').forEach((b) => (b.onclick = () => api.openFolder(b.dataset.folder)));
@@ -368,12 +367,38 @@ const PACKS = [
   }
 ];
 
+// ZeroCord's own plugins (on top of Equicord's)
+const ZC_PLUGINS = [
+  {
+    key: 'fakeMute', name: 'FakeMute',
+    description: 'Adds a button next to your mic and headphones. When it is on, people in the call see you as muted while your microphone keeps working.'
+  }
+];
+const zcEnabled = (key) => !!(state[key] && state[key].enabled);
+async function setZcPlugin(key, on) {
+  if (key === 'fakeMute') state.fakeMute = await api.fakeMute(on);
+  toast(on ? 'Enabled: the button shows up next to your mic' : 'Disabled');
+  drawZcPlugins();
+}
+function drawZcPlugins() {
+  const box = $('#zc-plugins');
+  box.replaceChildren(el('div', { class: 'card pack' },
+    el('div', { class: 'row' }, el('div', {}, el('h2', {}, 'ZeroCord plugins'), el('p', { class: 'sub' }, 'Made for ZeroCord. They apply instantly, no reload needed.'))),
+    el('div', { class: 'plugins' }, ZC_PLUGINS.map((p) =>
+      el('div', { class: 'plugin' },
+        el('div', {}, el('b', {}, p.name, el('span', { class: 'tag-system' }, 'zerocord')), el('small', {}, p.description)),
+        toggle(zcEnabled(p.key), (v) => setZcPlugin(p.key, v))
+      )))
+  ));
+}
+
 let subTab = 'packs';
 document.querySelectorAll('.subtabs button').forEach((b) => {
   b.onclick = () => {
     subTab = b.dataset.sub;
     document.querySelectorAll('.subtabs button').forEach((x) => x.classList.toggle('active', x === b));
     $('#packs').classList.toggle('hidden', subTab !== 'packs');
+    $('#zc-plugins').classList.toggle('hidden', subTab !== 'packs');
     $('#all').classList.toggle('hidden', subTab !== 'all');
     loadPlugins();
   };
@@ -381,6 +406,7 @@ document.querySelectorAll('.subtabs button').forEach((b) => {
 
 let allPlugins = [];
 async function loadPlugins() {
+  drawZcPlugins();
   const list = await api.pluginsList();
   if (!list) {
     $('#plugins-note').textContent = "Plugins haven't loaded yet (or they're disabled in Settings). Wait for Discord to open and click this tab again.";
@@ -389,7 +415,7 @@ async function loadPlugins() {
   }
   allPlugins = list;
   const engine = state.config.mod === 'vencord' ? 'Vencord' : 'Equicord';
-  $('#plugins-total').textContent = `(${list.length})`;
+  $('#plugins-total').textContent = `(${list.length + ZC_PLUGINS.length})`;
   $('#plugins-note').textContent = `Running ${engine}. Client mods are against Discord's Terms of Service: bans are rare, but avoid plugins that send messages on your behalf.`;
   if (subTab === 'packs') drawPacks(); else drawAll();
 }
@@ -425,6 +451,16 @@ function drawAll() {
   const box = $('#plugin-list');
   box.replaceChildren();
   let n = 0;
+  for (const p of ZC_PLUGINS) {
+    if (search && !(p.name + ' ' + p.description).toLowerCase().includes(search)) continue;
+    const on = zcEnabled(p.key);
+    if ((filter === 'on' && !on) || (filter === 'off' && on)) continue;
+    n++;
+    box.append(el('div', { class: 'plugin' },
+      el('div', {}, el('b', {}, p.name, el('span', { class: 'tag-system' }, 'zerocord')), el('small', { title: p.description }, p.description)),
+      toggle(on, (v) => setZcPlugin(p.key, v))
+    ));
+  }
   for (const p of allPlugins) {
     if (search && !(p.name + ' ' + p.description + ' ' + p.tags.join(' ')).toLowerCase().includes(search)) continue;
     if (filter === 'on' && !p.enabled) continue;
@@ -440,37 +476,6 @@ function drawAll() {
 $('#plugins-search').oninput = () => drawAll();
 $('#plugins-filter').onchange = () => drawAll();
 $('#plugins-apply').onclick = async () => { await api.reload(); toast('Reloading Discord…'); };
-
-// ======================================================
-//  FAKE MUTE
-// ======================================================
-function drawMute(st) {
-  const cfg = state.fakeMute || { enabled: true, hotkey: true };
-  $('#mute-enabled').checked = !!cfg.enabled;
-  $('#mute-hotkey').checked = !!cfg.hotkey;
-  const on = !!(st && st.active);
-  $('#mute-dot').classList.toggle('on', on);
-  $('#mute-title').textContent = on ? 'On' : 'Off';
-  $('#mute-sub').textContent = !st
-    ? 'Open Discord to use it.'
-    : on
-      ? (st.inCall ? 'Others in the call see you muted, but they can hear you.' : 'Takes effect as soon as you join a call.')
-      : 'Your real state is shown.';
-  const b = $('#mute-toggle');
-  b.textContent = on ? 'Turn off' : 'Turn on';
-  b.classList.toggle('on', on);
-  b.disabled = !cfg.enabled || !st;
-}
-async function loadMute() { drawMute(await api.fakeMuteState()); }
-$('#mute-toggle').onclick = async () => drawMute(await api.fakeMuteToggle());
-$('#mute-enabled').onchange = async (e) => {
-  state.fakeMute = Object.assign({}, state.fakeMute, { enabled: e.target.checked });
-  drawMute(await api.fakeMuteConfig({ enabled: e.target.checked }));
-};
-$('#mute-hotkey').onchange = async (e) => {
-  state.fakeMute = Object.assign({}, state.fakeMute, { hotkey: e.target.checked });
-  drawMute(await api.fakeMuteConfig({ hotkey: e.target.checked }));
-};
 
 // ======================================================
 //  CUSTOM CSS

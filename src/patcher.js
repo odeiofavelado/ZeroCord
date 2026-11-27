@@ -8,9 +8,19 @@ const Module = require('module');
 process.env.ZEROCORD_DATA = path.join(process.env.APPDATA || electron.app.getPath('appData'), 'ZeroCord');
 process.env.ZEROCORD_MODE = 'injected';
 
-// ...\app-1.0.xxxx\resources (the "app" folder created by the installer lives inside it)
+// Electron sees .asar files as folders; to check plain files we briefly turn that off
+function plain(fn) {
+  const previous = process.noAsar;
+  process.noAsar = true;
+  try { return fn(); } finally { process.noAsar = previous; }
+}
+
+// ...\app-1.0.xxxx\resources. The installer turned app.asar into a folder that loads us
+// and renamed Discord's original to _app.asar (older ZeroCord used a separate "app" folder).
 const resources = path.dirname(electron.app.getAppPath());
-const originalAsar = path.join(resources, 'app.asar');
+const originalAsar = plain(() => fs.existsSync(path.join(resources, '_app.asar')))
+  ? path.join(resources, '_app.asar')
+  : path.join(resources, 'app.asar');
 
 let core = null;
 try {
@@ -61,28 +71,26 @@ if (core) {
 // When Discord updates, it creates a new app-x.y.z folder without ZeroCord.
 // Put ZeroCord in it too (when Discord opens and when it closes).
 function reinject() {
-  const previous = process.noAsar;
-  process.noAsar = true; // see app.asar as a plain file, not a folder
-  try {
-    const root = path.dirname(path.dirname(resources)); // ...\Discord
-    const ourIndex = path.join(resources, 'app', 'index.js');
-    const ourPkg = path.join(resources, 'app', 'package.json');
-    for (const dir of fs.readdirSync(root)) {
-      if (!/^app-/.test(dir)) continue;
-      const res = path.join(root, dir, 'resources');
-      if (!fs.existsSync(path.join(res, 'app.asar'))) continue;
-      if (fs.existsSync(path.join(res, '_app.asar'))) continue; // another mod is installed
-      const target = path.join(res, 'app');
-      if (fs.existsSync(path.join(target, 'index.js'))) continue;
-      fs.mkdirSync(target, { recursive: true });
-      fs.copyFileSync(ourIndex, path.join(target, 'index.js'));
-      fs.copyFileSync(ourPkg, path.join(target, 'package.json'));
+  plain(() => {
+    try {
+      const root = path.dirname(path.dirname(resources)); // ...\Discord
+      const loader = electron.app.getAppPath();             // our app.asar (or legacy app) folder
+      const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+      for (const dir of fs.readdirSync(root)) {
+        if (!/^app-/.test(dir)) continue;
+        const res = path.join(root, dir, 'resources');
+        const asar = path.join(res, 'app.asar');
+        if (!fs.existsSync(asar) || isDir(asar)) continue;          // already has a loader (ours or another mod)
+        if (fs.existsSync(path.join(res, '_app.asar'))) continue;
+        fs.renameSync(asar, path.join(res, '_app.asar'));
+        fs.mkdirSync(asar);
+        fs.copyFileSync(path.join(loader, 'index.js'), path.join(asar, 'index.js'));
+        fs.copyFileSync(path.join(loader, 'package.json'), path.join(asar, 'package.json'));
+      }
+    } catch (e) {
+      console.error('[ZeroCord] reinject', e);
     }
-  } catch (e) {
-    console.error('[ZeroCord] reinject', e);
-  } finally {
-    process.noAsar = previous;
-  }
+  });
 }
 reinject();
 electron.app.on('before-quit', reinject);

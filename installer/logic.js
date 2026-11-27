@@ -39,7 +39,7 @@ const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { retu
 
 // Which client mod (if any) is loaded by this resources folder
 function detectMod(resources) {
-  for (const entry of [path.join(resources, 'app', 'index.js'), path.join(resources, 'app.asar', 'index.js')]) {
+  for (const entry of [path.join(resources, 'app.asar', 'index.js'), path.join(resources, 'app', 'index.js')]) {
     let t = '';
     try { t = fs.readFileSync(entry, 'utf8'); } catch { continue; }
     if (MARKERS.some((m) => t.includes(m))) return 'ZeroCord';
@@ -98,34 +98,51 @@ function copyFiles(log) {
   log('ZeroCord files copied');
 }
 
-// Removes an official Vencord/Equicord install, restoring Discord's original app.asar
-function removeOtherMod(resources) {
+// Windows can keep a file locked for a moment after Discord closes: retry briefly
+function renameRetry(from, to) {
+  for (let i = 0; ; i++) {
+    try { fs.renameSync(from, to); return; } catch (e) {
+      if (i >= 20 || !['EBUSY', 'EPERM', 'EACCES'].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+    }
+  }
+}
+
+// Puts Discord's original app.asar back (removes ZeroCord or another mod)
+function restoreOriginal(resources) {
   const asar = path.join(resources, 'app.asar');
   const original = path.join(resources, '_app.asar');
   if (exists(original)) {
     if (isDir(asar)) fs.rmSync(asar, { recursive: true, force: true });
-    if (!exists(asar)) fs.renameSync(original, asar);
+    if (!exists(asar)) renameRetry(original, asar);
   }
+  // legacy layout (resources/app)
   const appDir = path.join(resources, 'app');
   if (isDir(appDir)) fs.rmSync(appDir, { recursive: true, force: true });
 }
+const removeOtherMod = restoreOriginal;
 
+// Same method Vencord/Equicord use: Discord's app.asar becomes _app.asar and
+// app.asar becomes a folder that loads ZeroCord, which then starts the original.
 function injectInto(resources) {
-  const app = path.join(resources, 'app');
-  fs.mkdirSync(app, { recursive: true });
+  const asar = path.join(resources, 'app.asar');
+  const original = path.join(resources, '_app.asar');
+  const legacy = path.join(resources, 'app');
+  if (isDir(legacy)) fs.rmSync(legacy, { recursive: true, force: true });
+  if (!isDir(asar)) {
+    if (!exists(asar)) throw new Error('app.asar not found in ' + resources);
+    if (exists(original)) fs.rmSync(original, { force: true });
+    renameRetry(asar, original);
+    fs.mkdirSync(asar);
+  }
   const patcher = path.join(CODE_DIR(), 'patcher.js');
-  fs.writeFileSync(path.join(app, 'index.js'), `// ${MARKER}: loads ZeroCord, then the regular Discord\nrequire(${JSON.stringify(patcher)});\n`);
-  fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'discord', main: 'index.js' }, null, 2));
+  fs.writeFileSync(path.join(asar, 'index.js'), `// ${MARKER}: loads ZeroCord, then the regular Discord\nrequire(${JSON.stringify(patcher)});\n`);
+  fs.writeFileSync(path.join(asar, 'package.json'), JSON.stringify({ name: 'discord', main: 'index.js' }, null, 2));
 }
 
 function removeFrom(resources) {
-  const app = path.join(resources, 'app');
-  const index = path.join(app, 'index.js');
-  if (!exists(index)) return false;
-  let ours = false;
-  try { const t = fs.readFileSync(index, 'utf8'); ours = MARKERS.some((m) => t.includes(m)); } catch {}
-  if (!ours) return false;
-  fs.rmSync(app, { recursive: true, force: true });
+  if (detectMod(resources) !== 'ZeroCord') return false;
+  restoreOriginal(resources);
   return true;
 }
 

@@ -17,13 +17,12 @@
         <div class="sep"></div>
         <div class="cat">Plugins</div>
         <button data-tab="plugins">Plugins</button>
-        <button data-tab="mute">Fake Mute</button>
         <button data-tab="css">Custom CSS</button>
         <div class="sep"></div>
         <div class="cat">App</div>
         <button data-tab="settings">Settings</button>
         <div class="sep"></div>
-        <div class="footer">ZeroCord 2.0<br>Ctrl+Shift+M opens this panel</div>
+        <div class="footer">ZeroCord 2.0<br>Open it anytime from the ✦ button in Discord's top bar</div>
       </nav>
     </div>
   </aside>
@@ -146,6 +145,7 @@
         <button class="active" data-sub="packs">Curated packs</button>
         <button data-sub="all">All plugins <span id="plugins-total"></span></button>
       </div>
+      <div id="zc-plugins"></div>
       <div id="packs"></div>
       <div id="all" class="hidden">
         <div class="bar">
@@ -162,35 +162,6 @@
         <button id="plugins-apply">Apply (reload Discord)</button>
         <span class="sub">Each plugin has its own options under Settings → Plugins inside Discord.</span>
       </div>
-    </section>
-
-    <!-- ===================== FAKE MUTE ===================== -->
-    <section id="tab-mute" class="tab">
-      <header>
-        <h1>Fake Mute</h1>
-        <p>People in the call see you as muted, while your microphone keeps working.</p>
-      </header>
-      <div class="card mute-card">
-        <div class="mute-state">
-          <div id="mute-dot" class="dot"></div>
-          <div>
-            <h2 id="mute-title">Off</h2>
-            <p class="sub" id="mute-sub">Your real state is shown.</p>
-          </div>
-        </div>
-        <button id="mute-toggle" class="big">Turn on</button>
-      </div>
-      <div class="card settings-list">
-        <div class="row">
-          <div><b>Enable</b><p class="sub">When disabled, nothing here works and the shortcut is freed</p></div>
-          <label class="switch"><input type="checkbox" id="mute-enabled"><span></span></label>
-        </div>
-        <div class="row">
-          <div><b>Shortcut: Ctrl + Shift + Q</b><p class="sub">Toggle it straight from Discord</p></div>
-          <label class="switch"><input type="checkbox" id="mute-hotkey"><span></span></label>
-        </div>
-      </div>
-      <p class="hint">While it's on, the ✦ icon at the top turns red. It turns itself off when Discord closes.</p>
     </section>
 
     <!-- ===================== CSS ===================== -->

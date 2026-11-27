@@ -20,12 +20,12 @@
 | | |
 |---|---|
 | **Plugins** | 370+ plugins powered by [Equicord](https://github.com/Equicord/Equicord), with curated packs, search and one-click toggles. Vencord is available as an alternative engine. |
-| **Control panel** | A settings panel styled after Discord's own. Open it from the ✦ icon in the top bar or with `Ctrl` + `Shift` + `M`. |
+| **Control panel** | A settings panel styled after Discord's own. Open it from the ✦ button in Discord's top bar. |
 | **Themes** | Six built-in themes, live previews, and support for any `.css` theme file or link. |
 | **Animated background** | Use any video, GIF or image as your Discord background, with adjustable intensity and blend modes. |
 | **Custom sounds** | Replace, rebalance or mute any Discord sound individually. |
 | **Profile & badges** | Change your display name, username, avatar and badges locally. Only you see these changes. |
-| **Fake mute** | Appear muted to others in a call while your microphone keeps working. Toggle it with `Ctrl` + `Shift` + `Q`. |
+| **Fake Mute plugin** | Optional plugin that adds a button next to your mic and headphones. When on, others in the call see you as muted while your microphone keeps working. |
 | **Seamless install** | Installs into the official Discord Stable, PTB and Canary clients and survives Discord updates. |
 
 <div align="center">
@@ -66,12 +66,9 @@ npm start
 
 ## Usage
 
-| Shortcut | Action |
-|---|---|
-| `Ctrl` + `Shift` + `M` | Open the ZeroCord panel |
-| `Ctrl` + `Shift` + `Q` | Toggle fake mute |
-
-Your settings, themes, sounds and profile files are stored in `%APPDATA%\ZeroCord`. Drop any `.css` file into the `themes` folder there and it's applied instantly.
+- Click the **✦** button in Discord's top bar to open the ZeroCord panel.
+- Turn plugins on or off in **Plugins**. ZeroCord's own plugins (like **FakeMute**) are listed at the top.
+- Your settings, themes, sounds and profile files are stored in `%APPDATA%\ZeroCord`. Drop any `.css` file into the `themes` folder there and it's applied instantly.
 
 ## Building
 
@@ -90,7 +87,7 @@ src/
 ├── patcher.js       Entry point inside the official Discord client
 ├── standalone.js    Entry point for the standalone app
 ├── preload.js       Injects the plugin engine before Discord loads
-├── runtime.js       In-page features: background, sounds, profile, fake mute
+├── runtime.js       In-page features: background, sounds, profile, FakeMute, buttons
 ├── panel/           The control panel UI
 ├── themes/          Built-in themes
 └── vendor/          Bundled Equicord / Vencord builds

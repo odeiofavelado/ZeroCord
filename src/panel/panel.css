@@ -200,6 +200,7 @@ input[type=range]::-webkit-slider-thumb {
 .plugin-grid .plugin small { max-height: 32px; overflow: hidden; }
 .plugin.unavailable { opacity: .45; }
 .tag-system {
+  white-space: nowrap;
   font-size: 10px; font-weight: 700; color: #fff; background: var(--blurple); border-radius: 3px; padding: 1px 4px; margin-left: 6px;
   text-transform: uppercase; vertical-align: 2px;
 }

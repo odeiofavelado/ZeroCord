@@ -46,7 +46,7 @@ const DEFAULTS = {
   sounds: {},
   soundsGlobal: { volume: 1, muted: false },
   profile: { enabled: false, displayName: '', username: '', avatar: '', badges: [] },
-  fakeMute: { enabled: true, hotkey: true },
+  fakeMute: { enabled: false },
   zeroTwoIcon: true
 };
 
@@ -83,7 +83,7 @@ function migrateLegacy() {
   }
   for (const [n, s] of Object.entries(out.sounds || {})) out.sounds[n] = { volume: s.volume ?? 1, muted: !!(s.mudo ?? s.muted), file: s.arquivo || s.file };
   if (out.soundsGlobal && 'mudo' in out.soundsGlobal) out.soundsGlobal = { volume: out.soundsGlobal.volume ?? 1, muted: !!out.soundsGlobal.mudo };
-  if (out.fakeMute && 'habilitado' in out.fakeMute) out.fakeMute = { enabled: !!out.fakeMute.habilitado, hotkey: !!out.fakeMute.atalho };
+  if (out.fakeMute && 'habilitado' in out.fakeMute) out.fakeMute = { enabled: false };
   const themes = {};
   for (const [id, on] of Object.entries(out.activeThemes || {})) themes[id.replace(/^arquivo:/, 'file:').replace(/^embutido:.*/, '')] = on;
   delete themes[''];
@@ -371,8 +371,15 @@ function profileData() {
   };
 }
 
+let reloadedForApis = false;
 async function applyAllInPage() {
   await runInPage(fs.readFileSync(path.join(__dirname, 'runtime.js'), 'utf8'));
+  // First launch: turn on Equicord's button APIs, which only take effect after one reload
+  if (config.plugins && !reloadedForApis && (await call('ensureApis'))) {
+    reloadedForApis = true;
+    mainWindow.webContents.reload();
+    return;
+  }
   await call('background', backgroundData());
   await call('setSounds', soundsData());
   await call('panelButton', !!config.panelButton);
@@ -400,16 +407,12 @@ function attachWindow(win, { standalone = false } = {}) {
     await applyAllInPage();
   });
 
-  win.webContents.on('before-input-event', (e, input) => {
-    if (input.type !== 'keyDown') return;
-    const k = input.key.toLowerCase();
-    if (input.control && input.shift && k === 'm') { openPanel(); e.preventDefault(); return; }
-    if (!standalone) return;
-    if (input.control && !input.shift && k === 'r') { win.reload(); e.preventDefault(); }
-    if (input.key === 'F12') { win.webContents.toggleDevTools(); e.preventDefault(); }
-  });
-
   if (standalone) {
+    win.webContents.on('before-input-event', (e, input) => {
+      if (input.type !== 'keyDown') return;
+      if (input.control && !input.shift && input.key.toLowerCase() === 'r') { win.reload(); e.preventDefault(); }
+      if (input.key === 'F12') { win.webContents.toggleDevTools(); e.preventDefault(); }
+    });
     win.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\//.test(url)) shell.openExternal(url);
       return { action: 'deny' };
@@ -610,14 +613,12 @@ function registerPanel() {
   handle('reload', async () => { if (mainWindow) mainWindow.reload(); return true; });
 
   // ---- Fake mute ----
-  handle('fake-mute-config', async (partial) => {
-    config.fakeMute = Object.assign({}, DEFAULTS.fakeMute, config.fakeMute);
-    for (const k of ['enabled', 'hotkey']) if (k in partial) config.fakeMute[k] = !!partial[k];
+  handle('fake-mute', async (enabled) => {
+    config.fakeMute = { enabled: !!enabled };
     saveConfig();
-    return (await call('fakeMuteConfig', config.fakeMute)) || { active: false, enabled: config.fakeMute.enabled, inCall: false };
+    await call('fakeMuteConfig', config.fakeMute);
+    return config.fakeMute;
   });
-  handle('fake-mute-toggle', async () => (await call('fakeMuteToggle')) || null);
-  handle('fake-mute-state', async () => (await call('fakeMuteState')) || null);
 
   // ---- Custom CSS ----
   handle('css-read', async () => readText('custom.css'));

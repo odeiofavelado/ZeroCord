@@ -6,7 +6,7 @@ const channels = [
   'sounds-list', 'sound-pick', 'sound-config', 'sound-reset', 'sounds-global', 'sound-url',
   'profile', 'profile-avatar', 'badge-custom',
   'plugins-list', 'plugins-toggle', 'reload',
-  'fake-mute-config', 'fake-mute-toggle', 'fake-mute-state',
+  'fake-mute',
   'css-read', 'css-save', 'config', 'restart'
 ];
 

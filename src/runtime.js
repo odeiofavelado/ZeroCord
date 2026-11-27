@@ -12,6 +12,9 @@
   });
   const pathOf = (u) => { try { return new URL(u, location.href).pathname; } catch { return String(u || ''); } };
   const isDiscordSound = (p) => /\/assets\/.+\.(mp3|ogg|wav)$/i.test(p);
+  const V = () => window.Vencord;
+  const React = () => V() && V().Webpack && V().Webpack.Common && V().Webpack.Common.React;
+  const h = (...a) => React().createElement(...a);
   const findProps = (...props) => {
     try { return window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.findByProps(...props); } catch { return null; }
   };
@@ -275,7 +278,7 @@
   // ==========================================================
   //  Fake mute: people in the call see you muted, but you keep talking
   // ==========================================================
-  const FM = (Z._fakeMute = { cfg: { enabled: true, hotkey: true }, active: false, socket: null, originalSend: null, last: null, timer: null });
+  const FM = (Z._fakeMute = { cfg: { enabled: false }, active: false, socket: null, originalSend: null, last: null, timer: null });
   const getSocket = () => { const ws = findProps('getSocket'); try { return ws && ws.getSocket(); } catch { return null; } };
 
   // Intercepts the "voice state" update (op 4) sent to Discord's gateway
@@ -345,18 +348,59 @@
   };
 
   Z.fakeMuteToggle = (force) => {
-    if (!FM.cfg.enabled) return Z.fakeMuteState();
+    if (!FM.cfg.enabled && force !== false) return Z.fakeMuteState();
     FM.active = typeof force === 'boolean' ? force : !FM.active;
     wrapSocket();
     const inCall = resendVoiceState();
     paintButton();
-    toast(FM.active ? 'Fake mute on: you look muted' : 'Fake mute off', FM.active);
+    notify();
+    toast(FM.active ? 'Fake Mute on: you look muted' : 'Fake Mute off', FM.active);
     return Object.assign(Z.fakeMuteState(), { inCall });
   };
 
+  // Button next to mic / headphones (Equicord UserArea API, Discord's own button component)
+  const FAKE_MUTE_ID = 'zerocord-fake-mute';
+  FM.listeners = new Set();
+  const notify = () => FM.listeners.forEach((fn) => { try { fn(); } catch {} });
+
+  function FakeMuteIcon(props) {
+    return h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', className: props && props.className },
+      h('path', { fill: 'currentColor', d: 'M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4Z' }),
+      h('path', { fill: 'currentColor', d: 'M6 10a1 1 0 0 0-2 0 8 8 0 0 0 7 7.94V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.06A8 8 0 0 0 20 10a1 1 0 1 0-2 0 6 6 0 0 1-12 0Z' }),
+      h('path', { stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeDasharray: '2.5 3', d: 'M3 3l18 18' }));
+  }
+
+  function FakeMuteButton(props) {
+    const R = React();
+    const [, rerender] = R.useReducer((x) => x + 1, 0);
+    R.useEffect(() => { FM.listeners.add(rerender); return () => FM.listeners.delete(rerender); }, []);
+    const Button = V().Api.UserArea.UserAreaButton;
+    return h(Button, {
+      tooltipText: FM.active ? 'Turn off Fake Mute' : 'Turn on Fake Mute',
+      icon: FakeMuteIcon,
+      role: 'switch',
+      'aria-checked': FM.active,
+      ariaChecked: FM.active,
+      redGlow: FM.active,
+      plated: props && props.nameplate != null,
+      onClick: () => Z.fakeMuteToggle()
+    });
+  }
+
+  function setFakeMuteButton(show) {
+    const api = V() && V().Api && V().Api.UserArea;
+    if (!api || !api.addUserAreaButton) return false;
+    try {
+      if (show) api.addUserAreaButton(FAKE_MUTE_ID, FakeMuteButton, 50);
+      else api.removeUserAreaButton(FAKE_MUTE_ID);
+    } catch (e) { console.warn('[ZeroCord] fake mute button', e); return false; }
+    return true;
+  }
+
   Z.fakeMuteConfig = (cfg) => {
-    FM.cfg = Object.assign({ enabled: true, hotkey: true }, cfg || {});
+    FM.cfg = Object.assign({ enabled: false }, cfg || {});
     if (!FM.cfg.enabled && FM.active) Z.fakeMuteToggle(false);
+    setFakeMuteButton(FM.cfg.enabled);
     if (FM.cfg.enabled && !FM.timer) {
       // while active, the gateway connection can be recreated (reconnect): wrap it again when it changes
       FM.timer = setInterval(() => { if (FM.active) { try { wrapSocket(); } catch {} } }, 3000);
@@ -364,16 +408,22 @@
     return Z.fakeMuteState();
   };
 
-  document.addEventListener('keydown', (e) => {
-    if (FM.cfg.enabled && FM.cfg.hotkey && e.ctrlKey && e.shiftKey && e.code === 'KeyQ') {
-      e.preventDefault();
-      e.stopPropagation();
-      Z.fakeMuteToggle();
+  // ZeroCord's buttons use Equicord's header bar / user area APIs.
+  // Make sure those API plugins are on; returns true if a reload is needed.
+  Z.ensureApis = () => {
+    const v = V();
+    if (!v || !v.Settings || !v.Settings.plugins || !v.Plugins || !v.Plugins.plugins) return false;
+    let changed = false;
+    for (const name of ['HeaderBarAPI', 'UserAreaAPI']) {
+      if (!v.Plugins.plugins[name]) continue;
+      if (!v.Settings.plugins[name]) v.Settings.plugins[name] = {};
+      if (!v.Settings.plugins[name].enabled) { v.Settings.plugins[name].enabled = true; changed = true; }
     }
-  }, true);
+    return changed;
+  };
 
   // ==========================================================
-  //  Panel button: a Discord-style icon next to Inbox / Help
+  //  Panel button: Discord-style icon in the top bar (fallback if the header API isn't available)
   // ==========================================================
   const ICON = '<svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24" fill="none">' +
     '<path fill="currentColor" d="M12 2a1 1 0 0 1 .97.76l.73 2.9a4 4 0 0 0 2.64 2.64l2.9.73a1 1 0 0 1 0 1.94l-2.9.73a4 4 0 0 0-2.64 2.64l-.73 2.9a1 1 0 0 1-1.94 0l-.73-2.9a4 4 0 0 0-2.64-2.64l-2.9-.73a1 1 0 0 1 0-1.94l2.9-.73A4 4 0 0 0 10.3 5.66l.73-2.9A1 1 0 0 1 12 2Z"/>' +
@@ -431,6 +481,8 @@
   function placeButton() {
     if (!buttonOn) return;
     const current = document.getElementById('zc-panel-button');
+    // The official header bar button is showing: no need for the fallback icon
+    if (headerApiUsed && document.querySelector('.zc-header-button')) { if (current) current.remove(); return; }
     const neighbor = findNeighbor();
     if (neighbor && neighbor.parentElement) {
       if (current && current.parentElement === neighbor.parentElement && current.nextSibling === neighbor) return;
@@ -445,9 +497,36 @@
     document.body.appendChild(b);
   }
 
+  function ZeroCordIcon(props) {
+    return h('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', className: props && props.className },
+      h('path', { fill: 'currentColor', d: 'M12 2a1 1 0 0 1 .97.76l.73 2.9a4 4 0 0 0 2.64 2.64l2.9.73a1 1 0 0 1 0 1.94l-2.9.73a4 4 0 0 0-2.64 2.64l-.73 2.9a1 1 0 0 1-1.94 0l-.73-2.9a4 4 0 0 0-2.64-2.64l-2.9-.73a1 1 0 0 1 0-1.94l2.9-.73A4 4 0 0 0 10.3 5.66l.73-2.9A1 1 0 0 1 12 2Z' }),
+      h('path', { fill: 'currentColor', opacity: '.7', d: 'M19 15a.75.75 0 0 1 .73.57l.25 1a1.5 1.5 0 0 0 1.45 1.18l.07.01a.75.75 0 0 1 0 1.48l-.07.01a1.5 1.5 0 0 0-1.45 1.18l-.25 1a.75.75 0 0 1-1.46 0l-.25-1a1.5 1.5 0 0 0-1.45-1.18l-.07-.01a.75.75 0 0 1 0-1.48l.07-.01a1.5 1.5 0 0 0 1.45-1.18l.25-1A.75.75 0 0 1 19 15Z' }));
+  }
+  function HeaderButton() {
+    const Button = V().Api.HeaderBar.HeaderBarButton;
+    return h(Button, {
+      className: 'zc-header-button',
+      tooltip: 'ZeroCord',
+      icon: ZeroCordIcon,
+      onClick: () => window.ZeroCordNative && window.ZeroCordNative.openPanel()
+    });
+  }
+  const HEADER_ID = 'zerocord-panel';
+  let headerApiUsed = false;
+  function setHeaderButton(show) {
+    const api = V() && V().Api && V().Api.HeaderBar;
+    if (!api || !api.addHeaderBarButton) return false;
+    try {
+      if (show) api.addHeaderBarButton(HEADER_ID, HeaderButton, 1000);
+      else api.removeHeaderBarButton(HEADER_ID);
+    } catch (e) { console.warn('[ZeroCord] header button', e); return false; }
+    return true;
+  }
+
   let buttonObserver = null;
   Z.panelButton = (show) => {
     buttonOn = !!show;
+    headerApiUsed = setHeaderButton(!!show);
     if (!show) {
       const b = document.getElementById('zc-panel-button');
       if (b) b.remove();

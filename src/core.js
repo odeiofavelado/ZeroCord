@@ -207,6 +207,7 @@ function setupSession() {
     else if (u.hostname === 'profile') file = data('profile', name);
     else if (u.hostname === 'badge') file = path.join(__dirname, 'badges', name);
     else if (u.hostname === 'icon') file = path.join(__dirname, 'icons', name);
+    else if (u.hostname === 'asset') file = path.join(__dirname, 'assets', name);
     if (!file || !fs.existsSync(file)) return new Response('not found', { status: 404 });
     return net.fetch(pathToFileURL(file).toString());
   });

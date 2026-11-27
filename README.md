@@ -27,6 +27,10 @@ Everything lives inside Discord's own settings, under **ZeroCord Settings → Pl
 | **ZeroCordThemes** | Six built-in themes plus any `.css` theme file or link, toggled individually. |
 | **LocalProfile** | Change your display name, username, avatar and badges. Only you see these changes. |
 | **Performance** | Fewer animations, blocked telemetry and interface zoom. |
+| **ZeroTwoBuddy** | An animated Zero Two in a corner of Discord. Click her and she says something. |
+| **QuickReplies** | A ⚡ button next to the message box with your saved replies, inserted with one click. |
+| **AutoTheme** | Switches between a day theme and a night theme automatically. |
+| **FocusMode** | A button next to your mic that hides the server, channel and member lists. |
 
 ZeroCord also installs into the official Discord **Stable, PTB and Canary** clients, stays installed across Discord updates and can give Discord a Zero Two icon.
 

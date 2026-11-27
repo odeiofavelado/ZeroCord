@@ -407,6 +407,157 @@
         Btn('Add badge with my own image…', () => { act('addCustomBadge', name || 'My badge'); setName(''); }, 'grey')));
   }
 
+  // ==========================================================
+  //  ZeroCord-exclusive plugins (settings kept by Equicord)
+  // ==========================================================
+  const pstore = (name) => { const s = V().Settings.plugins; return s[name] || (s[name] = {}); };
+  const styleTag = (id, cssText) => {
+    let el = document.getElementById(id);
+    if (!cssText) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+    el.textContent = cssText;
+  };
+
+  // --- ZeroTwoBuddy: an animated Zero Two in a corner of Discord ---
+  const BUDDY_LINES = ['Hi, darling!', 'Ready to chat?', 'Drink some water, darling.', 'You look great today.', "Let's go, darling!", 'I missed you.', 'Pilot, are you ready?'];
+  function applyBuddy(on) {
+    let el = document.getElementById('zc-buddy');
+    if (!on) { if (el) el.remove(); styleTag('zc-buddy-style', null); return; }
+    const s = pstore('ZeroTwoBuddy');
+    const pose = s.pose || 'smile';
+    const corner = s.corner || 'bottom-right';
+    const size = Number(s.size) || 140;
+    styleTag('zc-buddy-style', `
+      #zc-buddy { position: fixed; z-index: 2147483645; width: ${size}px; pointer-events: none; opacity: ${(Number(s.opacity) || 100) / 100}; }
+      #zc-buddy img { width: 100%; display: block; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 6px 14px rgba(0,0,0,.45)); animation: zc-float 4s ease-in-out infinite; }
+      #zc-buddy .zc-bubble { position: absolute; bottom: 100%; ${corner.endsWith('left') ? 'left' : 'right'}: 10%; margin-bottom: 6px; padding: 6px 10px; border-radius: 10px;
+        background: #fff; color: #3a0f22; font: 600 13px/1.3 "gg sans","Noto Sans",sans-serif; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.3); opacity: 0; transition: opacity .2s; }
+      #zc-buddy .zc-bubble.show { opacity: 1; }
+      @keyframes zc-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }`);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'zc-buddy';
+      el.innerHTML = '<div class="zc-bubble"></div><img alt="">';
+      el.querySelector('img').addEventListener('click', () => {
+        const b = el.querySelector('.zc-bubble');
+        b.textContent = BUDDY_LINES[Math.floor(Math.random() * BUDDY_LINES.length)];
+        b.classList.add('show');
+        clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('show'), 2500);
+      });
+      document.body.appendChild(el);
+    }
+    el.querySelector('img').src = 'zerocord://asset/zero-two-' + pose + '.webp';
+    Object.assign(el.style, { top: '', bottom: '', left: '', right: '' });
+    const [v, h2] = corner.split('-');
+    el.style[v] = v === 'top' ? '56px' : '84px';
+    el.style[h2] = h2 === 'left' ? '84px' : '24px';
+  }
+
+  // --- QuickReplies: saved replies from a chat bar button ---
+  const QR_ID = 'zerocord-quick-replies';
+  const replyList = () => String(pstore('QuickReplies').replies || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  function QuickRepliesIcon() {
+    return h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none' },
+      h('path', { fill: 'currentColor', d: 'M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm9 3-4 6h3l-1 4 4-6h-3l1-4Z' }));
+  }
+  function openRepliesMenu(anchor) {
+    document.getElementById('zc-qr-menu')?.remove();
+    const items = replyList();
+    const menu = document.createElement('div');
+    menu.id = 'zc-qr-menu';
+    const r = anchor.getBoundingClientRect();
+    Object.assign(menu.style, {
+      position: 'fixed', zIndex: '2147483647', right: Math.max(8, innerWidth - r.right) + 'px', bottom: (innerHeight - r.top + 8) + 'px',
+      minWidth: '220px', maxWidth: '360px', maxHeight: '320px', overflowY: 'auto', padding: '6px', borderRadius: '8px',
+      background: 'var(--background-floating, #111214)', boxShadow: '0 8px 16px rgba(0,0,0,.35)', font: '500 14px "gg sans","Noto Sans",sans-serif'
+    });
+    const add = (text, onClick, muted) => {
+      const it = document.createElement('div');
+      it.textContent = text;
+      Object.assign(it.style, { padding: '8px 10px', borderRadius: '4px', cursor: onClick ? 'pointer' : 'default', color: muted ? '#949ba4' : '#dbdee1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      if (onClick) { it.onmouseenter = () => (it.style.background = '#5865f2'); it.onmouseleave = () => (it.style.background = ''); it.onclick = onClick; }
+      menu.appendChild(it);
+    };
+    if (!items.length) add('No replies yet: add them under QuickReplies ⚙', null, true);
+    items.forEach((text) => add(text, () => { try { V().Util.insertTextIntoChatInputBox(text + ' '); } catch (e) { zlog('quick reply insert failed', String(e)); } menu.remove(); }));
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener('mousedown', function close(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('mousedown', close); } }), 0);
+  }
+  function QuickRepliesButton({ isAnyChat }) {
+    if (isAnyChat === false) return null;
+    const Button = V().Api.ChatButtons.ChatBarButton;
+    return h(Button, { tooltip: 'Quick replies', onClick: (e) => openRepliesMenu(e.currentTarget) }, h(QuickRepliesIcon));
+  }
+  function applyQuickReplies(on) {
+    const api = V().Api && V().Api.ChatButtons;
+    if (!api || !api.addChatBarButton) return;
+    if (on) api.addChatBarButton(QR_ID, QuickRepliesButton, QuickRepliesIcon);
+    else api.removeChatBarButton(QR_ID);
+  }
+  function RepliesEditor() {
+    const R = React();
+    const [text, setText] = R.useState(String(pstore('QuickReplies').replies || ''));
+    return h('div', null,
+      h('textarea', {
+        value: text, rows: 8, placeholder: 'One reply per line',
+        style: Object.assign({}, css.input, { width: '100%', height: 'auto', padding: '10px', resize: 'vertical', fontFamily: 'inherit' }),
+        onChange: (e) => { setText(e.target.value); pstore('QuickReplies').replies = e.target.value; }
+      }),
+      h('div', { style: css.text }, 'One reply per line. They show up in the ⚡ button next to the message box.'));
+  }
+
+  // --- AutoTheme: day and night themes ---
+  let autoThemeTimer = null;
+  function autoThemeTick() {
+    const s = pstore('AutoTheme');
+    const hour = new Date().getHours();
+    const dayStart = Number(s.dayStart ?? 7), nightStart = Number(s.nightStart ?? 19);
+    const isDay = dayStart <= nightStart ? hour >= dayStart && hour < nightStart : !(hour >= nightStart && hour < dayStart);
+    const want = isDay ? s.dayTheme : s.nightTheme;
+    const other = isDay ? s.nightTheme : s.dayTheme;
+    const themes = (state && state.themes) || [];
+    const active = (id) => (themes.find((t) => t.id === id) || {}).active;
+    if (other && other !== 'none' && other !== want && active(other)) act('toggleTheme', { id: other, on: false });
+    if (want && want !== 'none' && !active(want)) act('toggleTheme', { id: want, on: true });
+  }
+  function applyAutoTheme(on) {
+    clearInterval(autoThemeTimer); autoThemeTimer = null;
+    if (on) { autoThemeTick(); autoThemeTimer = setInterval(autoThemeTick, 60 * 1000); }
+  }
+
+  // --- FocusMode: hide servers, channels and members ---
+  const FOCUS_ID = 'zerocord-focus-mode';
+  const FOCUS_CSS = `
+    nav[aria-label="Servers sidebar"], nav[class*="guilds_"], [class*="guilds_"][class*="wrapper_"],
+    [class*="sidebar_"][class*="container_"], div[class^="sidebar_"], div[class*=" sidebar_"],
+    [class*="membersWrap_"], [class*="membersWrap"], aside[class*="profilePanel_"] { display: none !important; }`;
+  const focusListeners = new Set();
+  function setFocus(on) {
+    pstore('FocusMode').active = !!on;
+    styleTag('zc-focus-style', on ? FOCUS_CSS : null);
+    focusListeners.forEach((fn) => { try { fn(); } catch {} });
+  }
+  function FocusIcon(props) {
+    return h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', className: props && props.className },
+      h('path', { fill: 'currentColor', d: 'M4 4h5v2H6v3H4V4Zm11 0h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z' }),
+      h('circle', { cx: 12, cy: 12, r: 2.5, fill: 'currentColor' }));
+  }
+  function FocusButton(props) {
+    const R = React();
+    const [, rerender] = R.useReducer((x) => x + 1, 0);
+    R.useEffect(() => { focusListeners.add(rerender); return () => focusListeners.delete(rerender); }, []);
+    const on = !!pstore('FocusMode').active;
+    return h(V().Api.UserArea.UserAreaButton, {
+      tooltipText: on ? 'Exit focus mode' : 'Focus mode', icon: FocusIcon, role: 'switch', 'aria-checked': on, ariaChecked: on,
+      redGlow: false, plated: props && props.nameplate != null, onClick: () => setFocus(!on)
+    });
+  }
+  function applyFocusMode(on) {
+    const api = V().Api && V().Api.UserArea;
+    if (api && api.addUserAreaButton) { if (on) api.addUserAreaButton(FOCUS_ID, FocusButton, 60); else api.removeUserAreaButton(FOCUS_ID); }
+    setFocus(on && !!pstore('FocusMode').active);
+  }
+
   // --- Plugin definitions ---
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const saveProfileText = debounce((k, v) => save({ profile: { [k]: v } }), 400);
@@ -465,6 +616,52 @@
         badges: { type: OPT.COMPONENT, description: 'Badges', component: BadgePicker }
       })
     },
+    ZeroTwoBuddy: {
+      local: true,
+      description: 'An animated Zero Two hangs out in a corner of Discord. Click her and she says something.',
+      tags: ['Fun', 'Appearance'],
+      apply: applyBuddy,
+      settings: () => ({
+        pose: { type: OPT.SELECT, description: 'Pose', onChange: () => applyBuddy(true), options: [
+          { label: 'Smiling', value: 'smile', default: true }, { label: 'Dancing', value: 'dance' }, { label: 'Pointing', value: 'point' }] },
+        corner: { type: OPT.SELECT, description: 'Corner', onChange: () => applyBuddy(true), options: [
+          { label: 'Bottom right', value: 'bottom-right', default: true }, { label: 'Bottom left', value: 'bottom-left' },
+          { label: 'Top right', value: 'top-right' }, { label: 'Top left', value: 'top-left' }] },
+        size: { type: OPT.SLIDER, description: 'Size (px)', markers: [80, 120, 160, 200, 260], default: 140, stickToMarkers: false, onChange: () => applyBuddy(true) },
+        opacity: { type: OPT.SLIDER, description: 'Opacity (%)', markers: [20, 40, 60, 80, 100], default: 100, stickToMarkers: false, onChange: () => applyBuddy(true) }
+      })
+    },
+    QuickReplies: {
+      local: true,
+      description: 'A ⚡ button next to the message box with your saved replies. One click puts the text in the message box.',
+      tags: ['Chat', 'Utility'],
+      dependencies: ['ChatInputButtonAPI'],
+      apply: applyQuickReplies,
+      settings: () => ({ replies: { type: OPT.COMPONENT, description: 'Your replies', component: RepliesEditor } })
+    },
+    AutoTheme: {
+      local: true,
+      description: 'Switches between a day theme and a night theme automatically.',
+      tags: ['Appearance', 'Utility'],
+      apply: applyAutoTheme,
+      settings: () => {
+        const opts = (picked) => [{ label: 'None', value: 'none', default: !picked }].concat(((state && state.themes) || []).map((t) => ({ label: t.name, value: t.id, default: t.id === picked })));
+        const hours = [0, 6, 12, 18, 23];
+        return {
+          dayTheme: { type: OPT.SELECT, description: 'Day theme', options: opts('builtin:4-sakura.css'), onChange: () => autoThemeTick() },
+          nightTheme: { type: OPT.SELECT, description: 'Night theme', options: opts('builtin:2-amoled.css'), onChange: () => autoThemeTick() },
+          dayStart: { type: OPT.SLIDER, description: 'Day starts at (hour)', markers: hours, default: 7, stickToMarkers: false, onChange: () => autoThemeTick() },
+          nightStart: { type: OPT.SLIDER, description: 'Night starts at (hour)', markers: hours, default: 19, stickToMarkers: false, onChange: () => autoThemeTick() }
+        };
+      }
+    },
+    FocusMode: {
+      local: true,
+      description: 'Adds a button next to your mic that hides the server list, channel list and member list so you can focus on the conversation.',
+      tags: ['Utility'],
+      dependencies: ['UserAreaAPI'],
+      apply: applyFocusMode
+    },
     Performance: {
       description: 'Snappier Discord: fewer animations, blocked telemetry and interface zoom.',
       tags: ['Utility'],
@@ -491,7 +688,10 @@
     const api = v.Api.Settings;
     for (const [name, def] of Object.entries(PLUGINS)) {
       if (v.Plugins.plugins[name]) continue;
-      const on = !!def.enabled(state.config);
+      const store = v.Settings.plugins[name] || (v.Settings.plugins[name] = {});
+      // ZeroCord-wide plugins follow ZeroCord's config; local ones keep their state in Equicord's settings
+      const on = def.local ? !!store.enabled : !!def.enabled(state.config);
+      const setEnabled = def.local ? (x) => { try { def.apply(x); } catch (e) { zlog(name + ' failed', String(e && e.stack || e)); } } : def.setEnabled;
       const plugin = {
         name,
         description: def.description,
@@ -500,8 +700,8 @@
         dependencies: def.dependencies,
         patches: [],
         started: on,
-        start() { def.setEnabled(true); },
-        stop() { def.setEnabled(false); }
+        start() { setEnabled(true); },
+        stop() { setEnabled(false); }
       };
       // Settings shown under the cog, stored by Equicord; changes are forwarded to ZeroCord
       if (def.settings) {
@@ -509,19 +709,18 @@
         const settings = api.definePluginSettings(settingsDef);
         settings.pluginName = name;
         plugin.settings = settings;
-        const store = v.Settings.plugins[name] || (v.Settings.plugins[name] = {});
         for (const [key, opt] of Object.entries(settingsDef)) {
           if (opt.type === OPT.COMPONENT) continue;
           const value = opt.type === OPT.SELECT ? (opt.options.find((o) => o.default) || opt.options[0]).value : opt.default;
-          if (store[key] !== value) store[key] = value;
+          if (def.local ? store[key] === undefined : store[key] !== value) store[key] = value;
           if (opt.onChange && api.SettingsStore && api.SettingsStore.addChangeListener) {
-            api.SettingsStore.addChangeListener(`plugins.${name}.${key}`, (val) => opt.onChange(val));
+            api.SettingsStore.addChangeListener(`plugins.${name}.${key}`, (val) => { if (!def.local || (v.Plugins.plugins[name] && v.Plugins.plugins[name].started)) opt.onChange(val); });
           }
         }
       }
       v.Plugins.plugins[name] = plugin;
-      const store = v.Settings.plugins[name] || (v.Settings.plugins[name] = {});
       if (!!store.enabled !== on) store.enabled = on;
+      if (def.local && on) setEnabled(true);
     }
     registered = true;
     return true;
@@ -595,7 +794,7 @@
     const v = V();
     if (!v || !v.Settings || !v.Settings.plugins || !v.Plugins || !v.Plugins.plugins) return false;
     let changed = false;
-    for (const name of ['UserAreaAPI', 'BadgeAPI']) {
+    for (const name of ['UserAreaAPI', 'BadgeAPI', 'ChatInputButtonAPI']) {
       if (!v.Plugins.plugins[name]) continue;
       if (!v.Settings.plugins[name]) v.Settings.plugins[name] = {};
       if (!v.Settings.plugins[name].enabled) { v.Settings.plugins[name].enabled = true; changed = true; }

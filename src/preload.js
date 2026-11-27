@@ -15,7 +15,7 @@ let modCode = ipcRenderer.sendSync('zc:mod-code');
 
 // Register ZeroCord's own plugins in the engine's plugin metadata, so they show up
 // in its Plugins page. Matched by shape (the variable name changes between builds).
-const ZEROCORD_PLUGINS = ['FakeMute', 'AnimatedBackground', 'ZeroCordThemes', 'LocalProfile', 'Performance'];
+const ZEROCORD_PLUGINS = ['FakeMute', 'AnimatedBackground', 'ZeroCordThemes', 'LocalProfile', 'Performance', 'ZeroTwoBuddy', 'QuickReplies', 'AutoTheme', 'FocusMode'];
 let metaPatched = false;
 if (modCode) {
   modCode = modCode.replace(/(\b[\w$]+)=\{(\[[\w$]+\.name\]:\{folderName:"src\/)/, (_m, name, rest) => {

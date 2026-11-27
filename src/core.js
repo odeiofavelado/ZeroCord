@@ -30,6 +30,17 @@ function log(...parts) {
   } catch {}
 }
 process.on('uncaughtException', (e) => log('uncaughtException', e));
+process.on('unhandledRejection', (e) => log('unhandledRejection', e));
+
+// Runs one step without letting a stuck or failing step block the rest
+const withTimeout = (promise, ms, label) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms))
+]);
+async function step(label, fn, ms = 10000) {
+  try { const r = await withTimeout(Promise.resolve().then(fn), ms, label); return r; }
+  catch (e) { log('step failed:', label, e); return null; }
+}
 
 // Reads a file from the data folder, falling back to the shipped defaults
 function readText(name, fallback = '') {
@@ -311,7 +322,8 @@ function watchThemes() {
 // ============================================================
 function runInPage(code, label = 'script') {
   if (!mainWindow || mainWindow.isDestroyed()) { log('runInPage skipped (no window):', label); return Promise.resolve(null); }
-  return mainWindow.webContents.executeJavaScript(code, true).catch((e) => { log('page error in', label + ':', e); return null; });
+  return withTimeout(mainWindow.webContents.executeJavaScript(code), 10000, 'page script ' + label)
+    .catch((e) => { log('page error in', label + ':', e); return null; });
 }
 // Calls a runtime function and reports errors thrown inside the page
 const call = (fn, ...args) => runInPage(
@@ -389,11 +401,13 @@ function attachWindow(win, { standalone = false } = {}) {
       if (/\/popout/i.test(new URL(url).pathname)) return;
       mainWindow = win;
     }
-    win.webContents.setZoomFactor(Number(config.zoom) || 1);
     noAnimKey = null; customCssKey = null; themeKeys = [];
-    await applyBaseCss();
-    await applyThemes();
-    await applyAllInPage();
+    // ZeroCord's features and settings first, then styles; each step is independent
+    await step('zoom', () => win.webContents.setZoomFactor(Number(config.zoom) || 1));
+    await step('features', applyAllInPage, 30000);
+    await step('base css', applyBaseCss);
+    await step('themes', applyThemes);
+    log('done');
   });
 
   if (standalone) {

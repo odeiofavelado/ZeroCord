@@ -27,6 +27,7 @@ try {
   core = require('./core');
 } catch (e) {
   console.error('[ZeroCord] failed to load, starting plain Discord', e);
+  try { fs.mkdirSync(process.env.ZEROCORD_DATA, { recursive: true }); fs.appendFileSync(path.join(process.env.ZEROCORD_DATA, 'zerocord.log'), `[${new Date().toISOString()}] core failed to load: ${e && e.stack}\n`); } catch {}
 }
 
 if (core) {
@@ -51,6 +52,9 @@ if (core) {
         // Discord sometimes changes the icon later: keep ours
         const setIcon = this.setIcon.bind(this);
         this.setIcon = () => setIcon(icon);
+      }
+      if (options && options.webPreferences && !options.zeroCord) {
+        core.log && core.log('BrowserWindow', { title: options.title, hasPreload: !!originalPreload || !!options.webPreferences.preload, wrapped: isDiscordWindow });
       }
       if (isDiscordWindow) {
         core.originalPreloads.set(this.webContents.id, originalPreload);

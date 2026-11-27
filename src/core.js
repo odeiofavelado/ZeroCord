@@ -20,6 +20,17 @@ const INJECTED = process.env.ZEROCORD_MODE === 'injected';
 const data = (...p) => path.join(dataDir(), ...p);
 const ensureDir = (p) => { try { fs.mkdirSync(p, { recursive: true }); } catch {} };
 
+// Diagnostic log: %APPDATA%\ZeroCord\zerocord.log (kept small)
+function log(...parts) {
+  try {
+    const file = data('zerocord.log');
+    try { if (fs.statSync(file).size > 512 * 1024) fs.writeFileSync(file, ''); } catch {}
+    const line = parts.map((x) => (x instanceof Error ? x.stack || x.message : typeof x === 'string' ? x : JSON.stringify(x))).join(' ');
+    fs.appendFileSync(file, `[${new Date().toISOString()}] ${line}\n`);
+  } catch {}
+}
+process.on('uncaughtException', (e) => log('uncaughtException', e));
+
 // Reads a file from the data folder, falling back to the shipped defaults
 function readText(name, fallback = '') {
   for (const base of [dataDir(), path.join(__dirname, 'defaults'), __dirname]) {
@@ -298,11 +309,15 @@ function watchThemes() {
 // ============================================================
 //  Runtime inside Discord (background, profile, fake mute, settings)
 // ============================================================
-function runInPage(code) {
-  if (!mainWindow || mainWindow.isDestroyed()) return Promise.resolve(null);
-  return mainWindow.webContents.executeJavaScript(code, true).catch((e) => { console.error('[ZeroCord]', e); return null; });
+function runInPage(code, label = 'script') {
+  if (!mainWindow || mainWindow.isDestroyed()) { log('runInPage skipped (no window):', label); return Promise.resolve(null); }
+  return mainWindow.webContents.executeJavaScript(code, true).catch((e) => { log('page error in', label + ':', e); return null; });
 }
-const call = (fn, ...args) => runInPage(`window.__zerocord && window.__zerocord.${fn}(...${JSON.stringify(args)})`);
+// Calls a runtime function and reports errors thrown inside the page
+const call = (fn, ...args) => runInPage(
+  `(async () => { try { if (!window.__zerocord) return { __zcError: 'runtime not loaded' }; return await window.__zerocord.${fn}(...${JSON.stringify(args)}); }
+   catch (e) { return { __zcError: String(e && (e.stack || e.message) || e) }; } })()`, fn
+).then((r) => { if (r && r.__zcError) { log('runtime error in', fn + ':', r.__zcError); return null; } return r; });
 
 function fileVersion(p) { try { return Math.floor(fs.statSync(p).mtimeMs); } catch { return 0; } }
 
@@ -341,14 +356,19 @@ function profileData() {
 
 let reloadedForApis = false;
 async function applyAllInPage() {
-  await runInPage(fs.readFileSync(path.join(__dirname, 'runtime.js'), 'utf8'));
+  log('applying ZeroCord to', mainWindow && mainWindow.webContents.getURL());
+  await runInPage(fs.readFileSync(path.join(__dirname, 'runtime.js'), 'utf8'), 'runtime.js');
+  const probe = await runInPage(`({ runtime: !!window.__zerocord, engine: typeof window.Vencord, metaPatched: !!window.__zcMetaPatched,
+    settingsPlugin: !!(window.Vencord && window.Vencord.Plugins && window.Vencord.Plugins.plugins && window.Vencord.Plugins.plugins.Settings),
+    apiSettings: !!(window.Vencord && window.Vencord.Api && window.Vencord.Api.Settings), userArea: !!(window.Vencord && window.Vencord.Api && window.Vencord.Api.UserArea) })`, 'probe');
+  log('page state:', probe);
   // First launch: turn on Equicord's button APIs, which only take effect after one reload
   if (config.plugins && !reloadedForApis && (await call('ensureApis'))) {
     reloadedForApis = true;
     mainWindow.webContents.reload();
     return;
   }
-  await call('setupEngine', pageState());
+  log('setupEngine:', await call('setupEngine', pageState()));
   await call('background', backgroundData());
   await call('fakeMuteConfig', Object.assign({}, DEFAULTS.fakeMute, config.fakeMute));
   call('setProfile', profileData()); // waits for Discord to load the user: don't block the rest
@@ -359,8 +379,10 @@ async function applyAllInPage() {
 // ============================================================
 function attachWindow(win, { standalone = false } = {}) {
   if (standalone) mainWindow = win;
+  log('window attached', standalone ? '(standalone)' : '(Discord client)');
   win.webContents.on('did-finish-load', async () => {
     const url = win.webContents.getURL();
+    log('did-finish-load', url);
     if (!isDiscord(url)) return;
     // In the official client, only the main window (not call popouts etc.)
     if (!standalone) {
@@ -551,10 +573,11 @@ let started = false;
 function startWhenReady() {
   if (started) return;
   started = true;
+  log('ZeroCord starting', { mode: process.env.ZEROCORD_MODE, electron: process.versions.electron, dir: __dirname });
   setupSession();
   registerPageIpc();
   watchThemes();
   if (config.plugins) updateMod();
 }
 
-module.exports = { config, attachWindow, startWhenReady, originalPreloads, DISCORD_URL };
+module.exports = { config, attachWindow, startWhenReady, originalPreloads, DISCORD_URL, log };

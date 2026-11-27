@@ -4,7 +4,7 @@
 
 # ZeroCord
 
-**A Discord client mod with 370+ plugins, themes, custom sounds and a built-in control panel.**
+**A Discord client mod with 370+ plugins, themes, an animated background and its own plugins, all inside Discord's settings.**
 
 ![Version](https://img.shields.io/badge/version-2.0.0-ff5c8a?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows-5865F2?style=flat-square)

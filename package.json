@@ -2,7 +2,7 @@
   "name": "zerocord",
   "productName": "ZeroCord",
   "version": "2.0.0",
-  "description": "A Discord client mod with 370+ plugins, themes, custom sounds and a built-in control panel.",
+  "description": "A Discord client mod with 370+ plugins, themes, an animated background and its own plugins, all inside Discord's settings.",
   "license": "GPL-3.0-or-later",
   "author": "odeiofavelado",
   "repository": {

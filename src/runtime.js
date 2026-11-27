@@ -527,14 +527,49 @@
 
   // --- FocusMode: hide servers, channels and members ---
   const FOCUS_ID = 'zerocord-focus-mode';
+  // Hides servers and members, and the channel list but not the user area (mic/headphones) inside it
   const FOCUS_CSS = `
     nav[aria-label="Servers sidebar"], nav[class*="guilds_"], [class*="guilds_"][class*="wrapper_"],
-    [class*="sidebar_"][class*="container_"], div[class^="sidebar_"], div[class*=" sidebar_"],
-    [class*="membersWrap_"], [class*="membersWrap"], aside[class*="profilePanel_"] { display: none !important; }`;
+    [class*="membersWrap_"], [class*="membersWrap"], aside[class*="profilePanel_"] { display: none !important; }
+    [class*="sidebar_"] > nav, [class*="sidebar_"] [class*="privateChannels_"], [class*="sidebar_"] [class*="scroller_"]:not([class*="panels_"] *) { display: none !important; }`;
+
+  // Always-visible way out while focus mode is on
+  function focusExitButton(show) {
+    let b = document.getElementById('zc-focus-exit');
+    if (!show) { if (b) b.remove(); return; }
+    if (b) return;
+    b = document.createElement('button');
+    b.id = 'zc-focus-exit';
+    b.textContent = '✕  Exit focus mode';
+    Object.assign(b.style, {
+      position: 'fixed', left: '16px', top: '12px', zIndex: '2147483647', height: '32px', padding: '0 14px', border: '0', borderRadius: '16px',
+      background: '#5865f2', color: '#fff', font: '600 13px "gg sans","Noto Sans",sans-serif', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,.35)'
+    });
+    b.onclick = () => setFocus(false);
+    document.body.appendChild(b);
+  }
+
   const focusListeners = new Set();
   function setFocus(on) {
     pstore('FocusMode').active = !!on;
     styleTag('zc-focus-style', on ? FOCUS_CSS : null);
+    focusExitButton(!!on);
+    // The mic/headphones area lives in the hidden sidebar, so show a floating exit button
+    let exit = document.getElementById('zc-focus-exit');
+    if (on && !exit) {
+      exit = document.createElement('button');
+      exit.id = 'zc-focus-exit';
+      exit.textContent = '✕  Exit focus mode';
+      Object.assign(exit.style, {
+        position: 'fixed', left: '16px', bottom: '16px', zIndex: '2147483647', height: '32px', padding: '0 14px',
+        border: 0, borderRadius: '16px', background: '#5865f2', color: '#fff', cursor: 'pointer',
+        font: '600 13px "gg sans","Noto Sans",sans-serif', boxShadow: '0 4px 12px rgba(0,0,0,.35)', opacity: '.85'
+      });
+      exit.onmouseenter = () => (exit.style.opacity = '1');
+      exit.onmouseleave = () => (exit.style.opacity = '.85');
+      exit.onclick = () => setFocus(false);
+      document.body.appendChild(exit);
+    } else if (!on && exit) exit.remove();
     focusListeners.forEach((fn) => { try { fn(); } catch {} });
   }
   function FocusIcon(props) {
@@ -657,7 +692,7 @@
     },
     FocusMode: {
       local: true,
-      description: 'Adds a button next to your mic that hides the server list, channel list and member list so you can focus on the conversation.',
+      description: 'Adds a button next to your mic that hides the server, channel and member lists so you can focus on the conversation. Leave it with the floating "Exit focus mode" button.',
       tags: ['Utility'],
       dependencies: ['UserAreaAPI'],
       apply: applyFocusMode

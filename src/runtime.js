@@ -1,4 +1,5 @@
-// Runs inside the Discord page. Driven by ZeroCord's core and the panel.
+// Runs inside the Discord page. Driven by ZeroCord's core.
+// ZeroCord's settings live in Discord's own settings, as plugins on Equicord's Plugins page.
 (() => {
   if (window.__zerocord) return;
   const Z = (window.__zerocord = {});
@@ -46,104 +47,6 @@
     const el = document.getElementById('zc-background');
     if (el && el.tagName === 'VIDEO') document.hidden ? el.pause() : el.play().catch(() => {});
   });
-
-  // ==========================================================
-  //  Sounds
-  // ==========================================================
-  const S = (Z._sounds = { cfg: {}, global: { volume: 1, muted: false }, byPath: {}, map: {}, detected: {} });
-
-  // Reads Discord's internal sound table (name -> file) from webpack
-  function findSoundMap() {
-    const wreq = window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.wreq;
-    if (!wreq || !wreq.m) return null;
-    const out = {};
-    for (const id of Object.keys(wreq.m)) {
-      let src;
-      try { src = Function.prototype.toString.call(wreq.m[id]); } catch { continue; }
-      if (src.indexOf('.mp3"') === -1) continue;
-      const re = /"\.\/([\w.-]+)\.mp3"\s*:\s*"?(\d+)"?/g;
-      let m, hits = 0;
-      while ((m = re.exec(src))) {
-        hits++;
-        try {
-          let v = wreq(m[2]);
-          v = (v && v.default) || v;
-          if (typeof v === 'string') out[m[1]] = new URL(v, location.href).href;
-        } catch {}
-      }
-      if (hits > 5 && Object.keys(out).length) break;
-    }
-    return Object.keys(out).length ? out : null;
-  }
-
-  Z.mapSounds = () => {
-    const m = findSoundMap();
-    if (m) {
-      S.map = m;
-      for (const [n, u] of Object.entries(m)) S.byPath[pathOf(u)] = n;
-    }
-    return !!m;
-  };
-
-  Z.listSounds = () => {
-    if (!Object.keys(S.map).length) Z.mapSounds();
-    return { mapped: Object.assign({}, S.map), detected: Object.assign({}, S.detected) };
-  };
-
-  Z.setSounds = (d) => {
-    S.cfg = (d && d.cfg) || {};
-    S.global = (d && d.global) || { volume: 1, muted: false };
-    return true;
-  };
-
-  const factor = (el) => {
-    const n = el.__zcName;
-    if (!n) return 1;
-    const c = S.cfg[n] || {};
-    return Math.max(0, Math.min(1, (c.volume ?? 1) * (S.global.volume ?? 1)));
-  };
-
-  // Volume: Discord sets it, we multiply by your setting
-  const volumeDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume');
-  Object.defineProperty(HTMLMediaElement.prototype, 'volume', {
-    configurable: true, enumerable: true,
-    get() { return this.__zcVolume ?? volumeDesc.get.call(this); },
-    set(v) { this.__zcVolume = v; volumeDesc.set.call(this, Math.max(0, Math.min(1, v * factor(this)))); }
-  });
-
-  // Every time Discord plays a sound, identify it and swap/mute it if you asked to
-  const originalPlay = HTMLMediaElement.prototype.play;
-  HTMLMediaElement.prototype.play = function () {
-    try {
-      if (this.id !== 'zc-background') {
-        const current = this.src || this.getAttribute('src') || '';
-        const orig = this.__zcSwapped && current === this.__zcSwapped ? this.__zcOrig : current;
-        const p = pathOf(orig);
-        if (isDiscordSound(p)) {
-          if (!S.byPath[p] && !Object.keys(S.map).length) Z.mapSounds();
-          let name = S.byPath[p];
-          if (!name) {
-            name = 'other-' + p.split('/').pop().split('.')[0].slice(0, 10);
-            S.byPath[p] = name;
-            S.detected[name] = new URL(orig, location.href).href;
-          }
-          this.__zcName = name;
-          this.__zcOrig = orig;
-          const c = S.cfg[name] || {};
-          if (S.global.muted || c.muted) return Promise.resolve();
-          const target = c.url ? new URL(c.url, location.href).href : null;
-          if (target) {
-            if (current !== target) { this.src = target; this.__zcSwapped = this.src; }
-          } else if (this.__zcSwapped && current === this.__zcSwapped) {
-            this.src = orig; this.__zcSwapped = null;
-          }
-          const requested = this.__zcVolume ?? volumeDesc.get.call(this);
-          volumeDesc.set.call(this, Math.max(0, Math.min(1, requested * factor(this))));
-        }
-      }
-    } catch (e) { console.warn('[ZeroCord] sounds', e); }
-    return originalPlay.apply(this, arguments);
-  };
 
   // ==========================================================
   //  Local profile (only you see it)
@@ -243,39 +146,6 @@
   };
 
   // ==========================================================
-  //  Plugins (Equicord / Vencord)
-  // ==========================================================
-  Z.listPlugins = () => {
-    const V = window.Vencord;
-    if (!V || !V.Plugins || !V.Plugins.plugins) return null;
-    const out = [];
-    for (const [name, pl] of Object.entries(V.Plugins.plugins)) {
-      if (!pl || pl.hidden) continue;
-      out.push({
-        name,
-        description: String(pl.description || ''),
-        tags: Array.isArray(pl.tags) ? pl.tags : [],
-        system: !!pl.required || name.endsWith('API'),
-        enabled: !!(V.Settings.plugins[name] && V.Settings.plugins[name].enabled) || !!pl.required
-      });
-    }
-    return out.sort((a, b) => (a.system - b.system) || a.name.localeCompare(b.name));
-  };
-
-  Z.togglePlugins = (names, on) => {
-    const V = window.Vencord;
-    if (!V || !V.Settings || !V.Settings.plugins) return null;
-    for (const n of names || []) {
-      try {
-        if (!(V.Plugins && V.Plugins.plugins && V.Plugins.plugins[n])) continue;
-        if (!V.Settings.plugins[n]) V.Settings.plugins[n] = {};
-        V.Settings.plugins[n].enabled = !!on;
-      } catch (e) { console.warn('[ZeroCord] plugin', n, e); }
-    }
-    return Z.listPlugins();
-  };
-
-  // ==========================================================
   //  Fake mute: people in the call see you muted, but you keep talking
   // ==========================================================
   const FM = (Z._fakeMute = { cfg: { enabled: false }, active: false, socket: null, originalSend: null, last: null, timer: null });
@@ -337,11 +207,6 @@
     t._timer = setTimeout(() => (t.style.opacity = '0'), 2200);
   }
 
-  function paintButton() {
-    const b = document.getElementById('zc-panel-button');
-    if (b) b.style.color = FM.active ? '#ed4245' : 'var(--interactive-normal, #b5bac1)';
-  }
-
   Z.fakeMuteState = () => {
     const selected = findProps('getVoiceChannelId');
     return { active: FM.active, enabled: FM.cfg.enabled, inCall: !!(selected && selected.getVoiceChannelId && selected.getVoiceChannelId()) };
@@ -352,7 +217,6 @@
     FM.active = typeof force === 'boolean' ? force : !FM.active;
     wrapSocket();
     const inCall = resendVoiceState();
-    paintButton();
     notify();
     toast(FM.active ? 'Fake Mute on: you look muted' : 'Fake Mute off', FM.active);
     return Object.assign(Z.fakeMuteState(), { inCall });
@@ -401,6 +265,7 @@
     FM.cfg = Object.assign({ enabled: false }, cfg || {});
     if (!FM.cfg.enabled && FM.active) Z.fakeMuteToggle(false);
     setFakeMuteButton(FM.cfg.enabled);
+    syncPlugin('FakeMute', FM.cfg.enabled);
     if (FM.cfg.enabled && !FM.timer) {
       // while active, the gateway connection can be recreated (reconnect): wrap it again when it changes
       FM.timer = setInterval(() => { if (FM.active) { try { wrapSocket(); } catch {} } }, 3000);
@@ -408,13 +273,292 @@
     return Z.fakeMuteState();
   };
 
-  // ZeroCord's buttons use Equicord's header bar / user area APIs.
-  // Make sure those API plugins are on; returns true if a reload is needed.
+  // ==========================================================
+  //  ZeroCord inside Discord's settings
+  //  Every ZeroCord feature is a plugin on Equicord's Plugins page, with its options under the cog.
+  // ==========================================================
+  const native = () => window.ZeroCordNative;
+  const OPT = { STRING: 0, NUMBER: 1, BOOLEAN: 3, SELECT: 4, SLIDER: 5, COMPONENT: 6 };
+  const ICON_URL = 'zerocord://icon/installer.png';
+  let state = null;
+  const stateListeners = new Set();
+  const setState = (s) => { if (s) { state = s; stateListeners.forEach((fn) => { try { fn(); } catch {} }); } return s; };
+  const save = (partial) => native().set(partial).then(setState);
+  const act = (name, arg) => native().action(name, arg).then(setState);
+
+  // --- small UI kit (Discord look, plain elements) ---
+  const css = {
+    row: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', margin: '8px 0' },
+    btn: { background: '#5865f2', color: '#fff', border: 0, borderRadius: '4px', padding: '0 14px', height: '32px', fontWeight: 500, fontSize: '14px', cursor: 'pointer' },
+    btnGrey: { background: '#4e5058' },
+    btnDanger: { background: 'transparent', border: '1px solid #da373c', color: 'var(--text-default, #dbdee1)' },
+    small: { height: '24px', padding: '0 10px', fontSize: '12px' },
+    input: { flex: 1, minWidth: '180px', background: 'var(--input-background, #1e1f22)', color: 'var(--text-default, #dbdee1)', border: 0, borderRadius: '4px', padding: '0 10px', height: '32px', fontSize: '14px' },
+    text: { color: 'var(--text-muted, #949ba4)', fontSize: '13px' },
+    item: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '6px', background: 'var(--background-secondary, #2b2d31)', marginBottom: '6px' },
+    chip: { display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 9px', borderRadius: '4px', background: 'var(--background-tertiary, #1e1f22)', border: '1px solid transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text-default, #dbdee1)' },
+    chipOn: { borderColor: '#5865f2', background: 'rgba(88,101,242,.15)' }
+  };
+  const Btn = (label, onClick, variant, small) =>
+    h('button', { style: Object.assign({}, css.btn, variant === 'grey' && css.btnGrey, variant === 'danger' && css.btnDanger, small && css.small), onClick }, label);
+
+  function useZcState() {
+    const R = React();
+    const [, rerender] = R.useReducer((x) => x + 1, 0);
+    R.useEffect(() => { stateListeners.add(rerender); return () => stateListeners.delete(rerender); }, []);
+    return state;
+  }
+
+  // --- AnimatedBackground: file picker ---
+  function BackgroundFile() {
+    const st = useZcState();
+    return h('div', null,
+      h('div', { style: css.text }, st && st.backgroundFile ? 'Current file: ' + st.backgroundFile : 'No background chosen yet.'),
+      h('div', { style: css.row }, Btn('Choose video, GIF or image…', () => act('pickBackground'))));
+  }
+
+  // --- ZeroCordThemes: theme manager ---
+  function ThemeManager() {
+    const R = React();
+    const st = useZcState();
+    const [link, setLink] = R.useState('');
+    const themes = (st && st.themes) || [];
+    return h('div', null,
+      h('div', { style: css.row },
+        Btn('Import theme (.css)…', () => act('importTheme')),
+        Btn('Open themes folder', () => act('openFolder', 'themes'), 'grey')),
+      h('div', { style: css.row },
+        h('input', { style: css.input, placeholder: 'Theme link (https://…css)', value: link, onChange: (e) => setLink(e.target.value) }),
+        Btn('Add link', () => { act('addThemeLink', link); setLink(''); }, 'grey')),
+      themes.length ? themes.map((t) =>
+        h('label', { key: t.id, style: css.item },
+          h('input', { type: 'checkbox', checked: !!t.active, onChange: (e) => act('toggleTheme', { id: t.id, on: e.target.checked }), style: { width: '18px', height: '18px', accentColor: '#5865f2' } }),
+          h('div', { style: { flex: 1 } },
+            h('div', { style: { fontWeight: 600, color: 'var(--header-primary, #f2f3f5)' } }, t.name, h('span', { style: Object.assign({}, css.text, { marginLeft: '8px', fontSize: '11px', textTransform: 'uppercase' }) }, t.source)),
+            t.description ? h('div', { style: css.text }, t.description) : null),
+          t.source !== 'Built-in' ? Btn('Remove', (e) => { e.preventDefault(); act('removeTheme', t.id); }, 'danger', true) : null))
+        : h('div', { style: css.text }, 'No themes yet.'),
+      h('div', { style: Object.assign({}, css.text, { marginTop: '8px' }) }, 'Any .css file you drop in the themes folder shows up here. More themes: betterdiscord.app/themes'));
+  }
+
+  // --- LocalProfile: avatar and badges ---
+  function AvatarPicker() {
+    const st = useZcState();
+    const url = st && st.profileUrls && st.profileUrls.avatar;
+    return h('div', { style: css.row },
+      url ? h('img', { src: url, width: 56, height: 56, style: { borderRadius: '50%', objectFit: 'cover' } }) : null,
+      Btn('Choose image or GIF…', () => act('pickAvatar')),
+      Btn('Use my original', () => act('resetAvatar'), 'grey'));
+  }
+
+  function BadgePicker() {
+    const R = React();
+    const st = useZcState();
+    const [name, setName] = R.useState('');
+    if (!st) return null;
+    const mine = (st.config.profile && st.config.profile.badges) || [];
+    const setBadges = (badges) => save({ profile: { badges } });
+    const customUrls = {};
+    ((st.profileUrls && st.profileUrls.badges) || []).forEach((b) => (customUrls[b.name] = b.url));
+    return h('div', null,
+      h('div', { style: Object.assign({}, css.row, { gap: '6px' }) }, st.badgePresets.map((b) => {
+        const on = mine.some((x) => x.preset === b.id);
+        return h('div', {
+          key: b.id, style: Object.assign({}, css.chip, on && css.chipOn),
+          onClick: () => setBadges(on ? mine.filter((x) => x.preset !== b.id) : [...mine, { name: b.name, preset: b.id }])
+        }, h('img', { src: b.url, width: 20, height: 20 }), b.name);
+      })),
+      mine.filter((b) => !b.preset).length ? h('div', { style: Object.assign({}, css.row, { gap: '6px' }) }, mine.map((b, i) => b.preset ? null :
+        h('div', { key: 'c' + i, style: Object.assign({}, css.chip, css.chipOn), title: 'Click to remove', onClick: () => setBadges(mine.filter((_, j) => j !== i)) },
+          customUrls[b.name] ? h('img', { src: customUrls[b.name], width: 20, height: 20 }) : null, b.name, ' ✕'))) : null,
+      h('div', { style: css.row },
+        h('input', { style: css.input, placeholder: 'Custom badge name', value: name, onChange: (e) => setName(e.target.value) }),
+        Btn('Add badge with my own image…', () => { act('addCustomBadge', name || 'My badge'); setName(''); }, 'grey')));
+  }
+
+  // --- Plugin definitions ---
+  const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  const saveProfileText = debounce((k, v) => save({ profile: { [k]: v } }), 400);
+
+  const PLUGINS = {
+    FakeMute: {
+      description: 'Appear muted to others in a call while your microphone keeps working. Adds a button next to your mic and headphones.',
+      tags: ['Voice', 'Utility'],
+      dependencies: ['UserAreaAPI'],
+      enabled: (c) => c.fakeMute,
+      setEnabled: (on) => { Z.fakeMuteConfig({ enabled: on }); save({ fakeMute: on }); }
+    },
+    AnimatedBackground: {
+      description: 'Use any video, GIF or image as your Discord background.',
+      tags: ['Appearance', 'Customisation'],
+      enabled: (c) => c.background,
+      setEnabled: (on) => save({ background: on }),
+      settings: (c) => ({
+        file: { type: OPT.COMPONENT, description: 'Background file', component: BackgroundFile },
+        intensity: { type: OPT.SLIDER, description: 'Intensity (%)', markers: [5, 25, 50, 75, 100], default: Math.round((c.backgroundOpacity || 0.25) * 100), stickToMarkers: false, onChange: (v) => save({ backgroundOpacity: v / 100 }) },
+        blend: {
+          type: OPT.SELECT, description: 'Blend mode', onChange: (v) => save({ backgroundBlend: v }),
+          options: [
+            { label: 'Screen (keeps text readable)', value: 'screen', default: c.backgroundBlend === 'screen' },
+            { label: 'Normal (transparent overlay)', value: 'normal', default: c.backgroundBlend === 'normal' },
+            { label: 'Overlay (more contrast)', value: 'overlay', default: c.backgroundBlend === 'overlay' },
+            { label: 'Soft light', value: 'soft-light', default: c.backgroundBlend === 'soft-light' },
+            { label: 'Lighten', value: 'lighten', default: c.backgroundBlend === 'lighten' }
+          ]
+        }
+      })
+    },
+    ZeroCordThemes: {
+      description: 'Built-in themes plus any .css theme file or link, toggled individually.',
+      tags: ['Appearance', 'Customisation'],
+      enabled: (c) => c.themesEnabled,
+      setEnabled: (on) => save({ themesEnabled: on }),
+      settings: () => ({ manager: { type: OPT.COMPONENT, description: 'Themes', component: ThemeManager } })
+    },
+    LocalProfile: {
+      description: 'Change your display name, username, avatar and badges. Only you can see these changes.',
+      tags: ['Appearance', 'Fun'],
+      dependencies: ['BadgeAPI'],
+      enabled: (c) => c.profile.enabled,
+      setEnabled: (on) => save({ profile: { enabled: on } }),
+      settings: (c) => ({
+        displayName: { type: OPT.STRING, description: 'Display name (empty keeps yours)', default: c.profile.displayName || '', onChange: (v) => saveProfileText('displayName', v) },
+        username: { type: OPT.STRING, description: 'Username (empty keeps yours)', default: c.profile.username || '', onChange: (v) => saveProfileText('username', v) },
+        avatar: { type: OPT.COMPONENT, description: 'Avatar', component: AvatarPicker },
+        badges: { type: OPT.COMPONENT, description: 'Badges', component: BadgePicker }
+      })
+    },
+    Performance: {
+      description: 'Snappier Discord: fewer animations, blocked telemetry and interface zoom.',
+      tags: ['Utility'],
+      enabled: (c) => c.noAnimations || c.blockTelemetry || Number(c.zoom) !== 1,
+      setEnabled: (on) => {
+        const s = V().Settings.plugins.Performance || {};
+        save(on
+          ? { noAnimations: s.noAnimations !== false, blockTelemetry: s.blockTelemetry !== false, zoom: (s.zoom || 100) / 100 }
+          : { noAnimations: false, blockTelemetry: false, zoom: 1 });
+      },
+      settings: (c) => ({
+        noAnimations: { type: OPT.BOOLEAN, description: 'Reduce animations', default: c.noAnimations !== false, onChange: (v) => save({ noAnimations: v }) },
+        blockTelemetry: { type: OPT.BOOLEAN, description: 'Block telemetry (applies after restarting Discord)', default: c.blockTelemetry !== false, onChange: (v) => save({ blockTelemetry: v }) },
+        zoom: { type: OPT.SLIDER, description: 'Interface zoom (%)', markers: [60, 80, 100, 120, 150], default: Math.round((Number(c.zoom) || 1) * 100), stickToMarkers: false, onChange: (v) => save({ zoom: v / 100 }) }
+      })
+    }
+  };
+
+  let registered = false;
+  function registerPlugins() {
+    const v = V();
+    if (registered) return true;
+    if (!window.__zcMetaPatched || !state || !v || !v.Plugins || !v.Plugins.plugins || !v.Settings || !v.Api || !v.Api.Settings) return false;
+    const api = v.Api.Settings;
+    for (const [name, def] of Object.entries(PLUGINS)) {
+      if (v.Plugins.plugins[name]) continue;
+      const on = !!def.enabled(state.config);
+      const plugin = {
+        name,
+        description: def.description,
+        authors: [{ name: 'ZeroCord', id: 0n }],
+        tags: def.tags,
+        dependencies: def.dependencies,
+        patches: [],
+        started: on,
+        start() { def.setEnabled(true); },
+        stop() { def.setEnabled(false); }
+      };
+      // Settings shown under the cog, stored by Equicord; changes are forwarded to ZeroCord
+      if (def.settings) {
+        const settingsDef = def.settings(state.config);
+        const settings = api.definePluginSettings(settingsDef);
+        settings.pluginName = name;
+        plugin.settings = settings;
+        const store = v.Settings.plugins[name] || (v.Settings.plugins[name] = {});
+        for (const [key, opt] of Object.entries(settingsDef)) {
+          if (opt.type === OPT.COMPONENT) continue;
+          const value = opt.type === OPT.SELECT ? (opt.options.find((o) => o.default) || opt.options[0]).value : opt.default;
+          if (store[key] !== value) store[key] = value;
+          if (opt.onChange && api.SettingsStore && api.SettingsStore.addChangeListener) {
+            api.SettingsStore.addChangeListener(`plugins.${name}.${key}`, (val) => opt.onChange(val));
+          }
+        }
+      }
+      v.Plugins.plugins[name] = plugin;
+      const store = v.Settings.plugins[name] || (v.Settings.plugins[name] = {});
+      if (!!store.enabled !== on) store.enabled = on;
+    }
+    registered = true;
+    return true;
+  }
+
+  function syncPlugin(name, on) {
+    const v = V();
+    if (!registered || !v || !v.Plugins.plugins[name]) return;
+    try {
+      if (!!v.Settings.plugins[name].enabled !== !!on) v.Settings.plugins[name].enabled = !!on;
+      v.Plugins.plugins[name].started = !!on;
+    } catch (e) { console.warn('[ZeroCord] plugin sync', e); }
+  }
+
+  // --- Branding: "ZeroCord Settings", ZeroCord icon, no Cloud / Backup & Restore ---
+  function SmallIcon(props) {
+    return h('img', { src: ICON_URL, width: (props && props.width) || 20, height: (props && props.height) || 20, style: { borderRadius: '6px' }, alt: '' });
+  }
+  const HIDDEN_ENTRIES = new Set(['equicord_cloud', 'equicord_backup_restore', 'vencord_cloud', 'vencord_backup_restore']);
+  function brandSettings() {
+    const v = V();
+    const settings = v && v.Plugins && v.Plugins.plugins && v.Plugins.plugins.Settings;
+    if (!settings || settings.__zerocord) return;
+    settings.__zerocord = true;
+    const buildEntry = settings.buildEntry;
+    const buildLayout = settings.buildLayout;
+    if (typeof buildEntry === 'function') {
+      settings.buildEntry = function (entry) {
+        if (!entry) return entry;
+        if (HIDDEN_ENTRIES.has(entry.key)) return null;
+        if (entry.key === 'equicord_main' || entry.key === 'vencord_main') {
+          entry = Object.assign({}, entry, { title: 'ZeroCord', panelTitle: 'ZeroCord Settings', Icon: SmallIcon });
+        }
+        return buildEntry.call(this, entry);
+      };
+    }
+    if (typeof buildLayout === 'function') {
+      settings.buildLayout = function (...args) {
+        const out = buildLayout.apply(this, args);
+        if (Array.isArray(out)) {
+          for (const item of out) {
+            if (item && (item.key === 'equicord_section' || item.key === 'vencord_section')) item.useTitle = () => 'ZeroCord Settings';
+          }
+        }
+        return out;
+      };
+    }
+  }
+
+  // Plugin cards show a "User Plugin" badge for ZeroCord plugins: use ZeroCord's icon instead
+  function swapBadges(node) {
+    if (!node || node.nodeType !== 1) return;
+    const imgs = node.matches && node.matches('img') ? [node] : node.querySelectorAll('img');
+    imgs.forEach((img) => {
+      if (!/icons\/misc\/userplugin\.png/.test(img.getAttribute('src') || '')) return;
+      img.setAttribute('src', ICON_URL);
+      img.alt = 'ZeroCord';
+      img.title = 'ZeroCord Plugin';
+      img.style.borderRadius = '4px';
+    });
+  }
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'attributes') swapBadges(m.target);
+      else m.addedNodes.forEach(swapBadges);
+    }
+  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+
+  // Equicord's user-area button API must be on for FakeMute's button; returns true if a reload is needed
   Z.ensureApis = () => {
     const v = V();
     if (!v || !v.Settings || !v.Settings.plugins || !v.Plugins || !v.Plugins.plugins) return false;
     let changed = false;
-    for (const name of ['HeaderBarAPI', 'UserAreaAPI']) {
+    for (const name of ['UserAreaAPI', 'BadgeAPI']) {
       if (!v.Plugins.plugins[name]) continue;
       if (!v.Settings.plugins[name]) v.Settings.plugins[name] = {};
       if (!v.Settings.plugins[name].enabled) { v.Settings.plugins[name].enabled = true; changed = true; }
@@ -422,127 +566,9 @@
     return changed;
   };
 
-  // ==========================================================
-  //  Panel button: Discord-style icon in the top bar (fallback if the header API isn't available)
-  // ==========================================================
-  const ICON = '<svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24" fill="none">' +
-    '<path fill="currentColor" d="M12 2a1 1 0 0 1 .97.76l.73 2.9a4 4 0 0 0 2.64 2.64l2.9.73a1 1 0 0 1 0 1.94l-2.9.73a4 4 0 0 0-2.64 2.64l-.73 2.9a1 1 0 0 1-1.94 0l-.73-2.9a4 4 0 0 0-2.64-2.64l-2.9-.73a1 1 0 0 1 0-1.94l2.9-.73A4 4 0 0 0 10.3 5.66l.73-2.9A1 1 0 0 1 12 2Z"/>' +
-    '<path fill="currentColor" d="M19 15a.75.75 0 0 1 .73.57l.25 1a1.5 1.5 0 0 0 1.45 1.18l.07.01a.75.75 0 0 1 0 1.48l-.07.01a1.5 1.5 0 0 0-1.45 1.18l-.25 1a.75.75 0 0 1-1.46 0l-.25-1a1.5 1.5 0 0 0-1.45-1.18l-.07-.01a.75.75 0 0 1 0-1.48l.07-.01a1.5 1.5 0 0 0 1.45-1.18l.25-1A.75.75 0 0 1 19 15Z" opacity=".7"/></svg>';
-
-  let buttonOn = false;
-  let tip = null;
-
-  function showTip(target) {
-    if (!tip) {
-      tip = document.createElement('div');
-      Object.assign(tip.style, {
-        position: 'fixed', zIndex: '2147483647', pointerEvents: 'none', padding: '8px 12px', borderRadius: '8px',
-        background: '#111214', color: '#dbdee1', font: '600 14px/18px "gg sans","Noto Sans","Segoe UI",sans-serif',
-        boxShadow: '0 8px 16px rgba(0,0,0,.24)', whiteSpace: 'nowrap', transition: 'opacity .1s', opacity: '0'
-      });
-      document.body.appendChild(tip);
-    }
-    tip.textContent = FM.active ? 'ZeroCord · fake mute on' : 'ZeroCord';
-    const r = target.getBoundingClientRect();
-    tip.style.left = Math.round(r.left + r.width / 2) + 'px';
-    tip.style.top = Math.round(r.bottom + 8) + 'px';
-    tip.style.transform = 'translateX(-50%)';
-    tip.style.opacity = '1';
-  }
-  const hideTip = () => { if (tip) tip.style.opacity = '0'; };
-
-  function makeButton(className) {
-    const b = document.createElement('div');
-    b.id = 'zc-panel-button';
-    b.setAttribute('role', 'button');
-    b.setAttribute('tabindex', '0');
-    b.setAttribute('aria-label', 'ZeroCord');
-    b.innerHTML = ICON;
-    if (className) b.className = className;
-    Object.assign(b.style, {
-      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-      color: FM.active ? '#ed4245' : 'var(--interactive-normal, #b5bac1)', transition: 'color .15s ease'
-    });
-    b.onmouseenter = () => { if (!FM.active) b.style.color = 'var(--interactive-hover, #dbdee1)'; showTip(b); };
-    b.onmouseleave = () => { b.style.color = FM.active ? '#ed4245' : 'var(--interactive-normal, #b5bac1)'; hideTip(); };
-    b.onclick = () => { hideTip(); window.ZeroCordNative && window.ZeroCordNative.openPanel(); };
-    b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.onclick(); } };
-    return b;
-  }
-
-  // Finds Discord's Help (or Inbox) icon so ours sits right next to it
-  function findNeighbor() {
-    const help = document.querySelector('a[href^="https://support.discord.com"]');
-    if (help) return help.closest('[class*="clickable"], [role="button"]') || help;
-    const inbox = document.querySelector('[aria-label="Inbox"], [aria-label="Caixa de entrada"], [aria-label="Caixa de Entrada"]');
-    return inbox ? (inbox.closest('[class*="clickable"], [role="button"]') || inbox) : null;
-  }
-
-  function placeButton() {
-    if (!buttonOn) return;
-    const current = document.getElementById('zc-panel-button');
-    // The official header bar button is showing: no need for the fallback icon
-    if (headerApiUsed && document.querySelector('.zc-header-button')) { if (current) current.remove(); return; }
-    const neighbor = findNeighbor();
-    if (neighbor && neighbor.parentElement) {
-      if (current && current.parentElement === neighbor.parentElement && current.nextSibling === neighbor) return;
-      if (current) current.remove();
-      neighbor.parentElement.insertBefore(makeButton(neighbor.className), neighbor);
-      return;
-    }
-    // No Discord header (e.g. login screen): a subtle floating icon in the corner
-    if (current) return;
-    const b = makeButton('');
-    Object.assign(b.style, { position: 'fixed', top: '8px', right: '96px', width: '24px', height: '24px', zIndex: '2147483647' });
-    document.body.appendChild(b);
-  }
-
-  function ZeroCordIcon(props) {
-    return h('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', className: props && props.className },
-      h('path', { fill: 'currentColor', d: 'M12 2a1 1 0 0 1 .97.76l.73 2.9a4 4 0 0 0 2.64 2.64l2.9.73a1 1 0 0 1 0 1.94l-2.9.73a4 4 0 0 0-2.64 2.64l-.73 2.9a1 1 0 0 1-1.94 0l-.73-2.9a4 4 0 0 0-2.64-2.64l-2.9-.73a1 1 0 0 1 0-1.94l2.9-.73A4 4 0 0 0 10.3 5.66l.73-2.9A1 1 0 0 1 12 2Z' }),
-      h('path', { fill: 'currentColor', opacity: '.7', d: 'M19 15a.75.75 0 0 1 .73.57l.25 1a1.5 1.5 0 0 0 1.45 1.18l.07.01a.75.75 0 0 1 0 1.48l-.07.01a1.5 1.5 0 0 0-1.45 1.18l-.25 1a.75.75 0 0 1-1.46 0l-.25-1a1.5 1.5 0 0 0-1.45-1.18l-.07-.01a.75.75 0 0 1 0-1.48l.07-.01a1.5 1.5 0 0 0 1.45-1.18l.25-1A.75.75 0 0 1 19 15Z' }));
-  }
-  function HeaderButton() {
-    const Button = V().Api.HeaderBar.HeaderBarButton;
-    return h(Button, {
-      className: 'zc-header-button',
-      tooltip: 'ZeroCord',
-      icon: ZeroCordIcon,
-      onClick: () => window.ZeroCordNative && window.ZeroCordNative.openPanel()
-    });
-  }
-  const HEADER_ID = 'zerocord-panel';
-  let headerApiUsed = false;
-  function setHeaderButton(show) {
-    const api = V() && V().Api && V().Api.HeaderBar;
-    if (!api || !api.addHeaderBarButton) return false;
-    try {
-      if (show) api.addHeaderBarButton(HEADER_ID, HeaderButton, 1000);
-      else api.removeHeaderBarButton(HEADER_ID);
-    } catch (e) { console.warn('[ZeroCord] header button', e); return false; }
-    return true;
-  }
-
-  let buttonObserver = null;
-  Z.panelButton = (show) => {
-    buttonOn = !!show;
-    headerApiUsed = setHeaderButton(!!show);
-    if (!show) {
-      const b = document.getElementById('zc-panel-button');
-      if (b) b.remove();
-      hideTip();
-      if (buttonObserver) { buttonObserver.disconnect(); buttonObserver = null; }
-      return;
-    }
-    placeButton();
-    if (!buttonObserver) {
-      let pending = false;
-      buttonObserver = new MutationObserver(() => {
-        if (pending) return;
-        pending = true;
-        requestAnimationFrame(() => { pending = false; placeButton(); });
-      });
-      buttonObserver.observe(document.body, { childList: true, subtree: true });
-    }
+  Z.setupEngine = (initialState) => {
+    setState(initialState);
+    brandSettings();
+    return registerPlugins();
   };
 })();

@@ -37,17 +37,15 @@ const DEFAULTS = {
   backgroundThrottling: true,
   plugins: true,
   mod: 'equicord',
-  panelButton: true,
   background: true,
   backgroundOpacity: 0.25,
   backgroundBlend: 'screen',
   onlineThemes: [],
   activeThemes: {},
-  sounds: {},
-  soundsGlobal: { volume: 1, muted: false },
   profile: { enabled: false, displayName: '', username: '', avatar: '', badges: [] },
   fakeMute: { enabled: false },
-  zeroTwoIcon: true
+  zeroTwoIcon: true,
+  themesEnabled: true
 };
 
 // ---- Migration from the old Portuguese names (MeuDiscord / early ZeroCord) ----
@@ -103,7 +101,7 @@ function saveConfig() {
 
 const currentMod = () => (MODS[config.mod] ? config.mod : 'equicord');
 
-// Internal protocol that serves local files (background, sounds, avatar, badges) to Discord
+// Internal protocol that serves local files (background, avatar, badges, icons) to Discord
 protocol.registerSchemesAsPrivileged([
   { scheme: 'zerocord', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true } }
 ]);
@@ -120,7 +118,6 @@ if (!findBackground()) {
 }
 
 let mainWindow = null;
-let panel = null;
 
 const isDiscord = (url) => {
   try { const h = new URL(url).hostname; return h === 'discord.com' || h.endsWith('.discord.com'); } catch { return false; }
@@ -170,9 +167,7 @@ ipcMain.handle('zc:fetch', async (e, url, options = {}) => {
   return { status: r.status, headers: headers.join('\r\n'), body: await r.arrayBuffer() };
 });
 
-ipcMain.on('zc:open-panel', (e) => {
-  if (isDiscord(senderUrl(e))) openPanel();
-});
+
 
 // ============================================================
 //  Session: telemetry, CSP, permissions, protocol
@@ -185,9 +180,9 @@ function setupSession() {
     const name = path.basename(decodeURIComponent(u.pathname));
     let file = null;
     if (u.hostname === 'background' && BACKGROUND_NAMES.includes(name)) file = data(name);
-    else if (u.hostname === 'sound') file = data('sounds', name);
     else if (u.hostname === 'profile') file = data('profile', name);
     else if (u.hostname === 'badge') file = path.join(__dirname, 'badges', name);
+    else if (u.hostname === 'icon') file = path.join(__dirname, 'icons', name);
     if (!file || !fs.existsSync(file)) return new Response('not found', { status: 404 });
     return net.fetch(pathToFileURL(file).toString());
   });
@@ -207,7 +202,7 @@ function setupSession() {
     );
   }
 
-  // Plugins, themes and sounds load external resources: drop the CSP on Discord pages only
+  // Plugins and themes load external resources: drop the CSP on Discord pages only
   ses.webRequest.onHeadersReceived({ urls: ['https://discord.com/*', 'https://*.discord.com/*'] }, (det, cb) => {
     const headers = det.responseHeaders || {};
     for (const k of Object.keys(headers)) if (/^content-security-policy(-report-only)?$/i.test(k)) delete headers[k];
@@ -278,7 +273,7 @@ async function applyThemes() {
   const wc = mainWindow.webContents;
   const old = themeKeys;
   themeKeys = [];
-  for (const t of listThemes().filter((x) => x.active)) {
+  for (const t of listThemes().filter((x) => x.active && config.themesEnabled !== false)) {
     try { themeKeys.push(await wc.insertCSS(t.css)); } catch {}
   }
   await removeKeys(wc, old);
@@ -294,35 +289,14 @@ async function applyBaseCss() {
   if (css.trim()) customCssKey = await wc.insertCSS(css);
 }
 
-let previewBusy = false;
-async function makePreview(id) {
-  if (!mainWindow || mainWindow.isDestroyed() || previewBusy) return null;
-  const theme = listThemes().find((t) => t.id === id);
-  if (!theme) return null;
-  previewBusy = true;
-  const wc = mainWindow.webContents;
-  try {
-    await removeKeys(wc, themeKeys);
-    themeKeys = [];
-    const k = await wc.insertCSS(theme.css);
-    await new Promise((r) => setTimeout(r, theme.source === 'Link' ? 1500 : 450));
-    const img = await wc.capturePage();
-    await wc.removeInsertedCSS(k);
-    return img.resize({ width: 640 }).toDataURL();
-  } finally {
-    await applyThemes();
-    previewBusy = false;
-  }
-}
-
 function watchThemes() {
   ensureDir(data('themes'));
   let wait;
-  try { fs.watch(data('themes'), () => { clearTimeout(wait); wait = setTimeout(() => { applyThemes(); notifyPanel(); }, 300); }); } catch {}
+  try { fs.watch(data('themes'), () => { clearTimeout(wait); wait = setTimeout(applyThemes, 300); }); } catch {}
 }
 
 // ============================================================
-//  Runtime inside Discord (background, sounds, profile, fake mute)
+//  Runtime inside Discord (background, profile, fake mute, settings)
 // ============================================================
 function runInPage(code) {
   if (!mainWindow || mainWindow.isDestroyed()) return Promise.resolve(null);
@@ -346,16 +320,10 @@ function backgroundData() {
 
 const localUrl = (kind, file) => {
   if (!file) return '';
-  const p = data(kind === 'sound' ? 'sounds' : 'profile', file);
+  const p = data('profile', file);
   if (!fs.existsSync(p)) return '';
   return `zerocord://${kind}/${encodeURIComponent(file)}?v=${fileVersion(p)}`;
 };
-
-function soundsData() {
-  const cfg = {};
-  for (const [name, c] of Object.entries(config.sounds || {})) cfg[name] = { volume: c.volume ?? 1, muted: !!c.muted, url: localUrl('sound', c.file) };
-  return { cfg, global: config.soundsGlobal || { volume: 1, muted: false } };
-}
 
 function profileData() {
   const p = config.profile || {};
@@ -380,9 +348,8 @@ async function applyAllInPage() {
     mainWindow.webContents.reload();
     return;
   }
+  await call('setupEngine', pageState());
   await call('background', backgroundData());
-  await call('setSounds', soundsData());
-  await call('panelButton', !!config.panelButton);
   await call('fakeMuteConfig', Object.assign({}, DEFAULTS.fakeMute, config.fakeMute));
   call('setProfile', profileData()); // waits for Discord to load the user: don't block the rest
 }
@@ -424,41 +391,22 @@ function attachWindow(win, { standalone = false } = {}) {
 
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
-    if (standalone && panel && !panel.isDestroyed()) panel.close();
   });
 }
 
 // ============================================================
-//  Panel
+//  Settings live inside Discord (Equicord's Plugins page): IPC for the page
 // ============================================================
-function openPanel() {
-  if (panel && !panel.isDestroyed()) { panel.show(); panel.focus(); return; }
-  panel = new BrowserWindow({
-    zeroCord: true,
-    width: 1060, height: 760, minWidth: 820, minHeight: 560,
-    title: 'ZeroCord Panel', backgroundColor: '#313338', autoHideMenuBar: true,
-    icon: path.join(__dirname, 'icons', process.platform === 'win32' ? 'discord.ico' : 'discord.png'),
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'panel', 'preload.js') }
-  });
-  panel.loadFile(path.join(__dirname, 'panel', 'index.html'));
-  panel.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
-  panel.on('closed', () => { panel = null; });
-}
-
-function notifyPanel() {
-  if (panel && !panel.isDestroyed()) panel.webContents.send('zc-panel:refresh');
-}
-
-const fromPanel = (e) => panel && !panel.isDestroyed() && e.sender === panel.webContents;
-function handle(channel, fn) {
-  ipcMain.handle('zc-panel:' + channel, async (e, ...args) => {
-    if (!fromPanel(e)) throw new Error('not allowed');
+const fromDiscord = (e) => isDiscord(senderUrl(e));
+function handlePage(channel, fn) {
+  ipcMain.handle('zc:' + channel, async (e, ...args) => {
+    if (!fromDiscord(e)) throw new Error('not allowed');
     return fn(...args);
   });
 }
 
 async function pickFile(title, extensions) {
-  const r = await dialog.showOpenDialog(panel, { title, properties: ['openFile'], filters: [{ name: 'Files', extensions }] });
+  const r = await dialog.showOpenDialog(mainWindow, { title, properties: ['openFile'], filters: [{ name: 'Files', extensions }] });
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
 }
 
@@ -481,163 +429,114 @@ function listBadgePresets() {
   } catch { return []; }
 }
 
-function panelState() {
+// Everything the in-Discord settings need
+function pageState() {
   return {
     config: {
-      hardwareAcceleration: config.hardwareAcceleration, blockTelemetry: config.blockTelemetry,
-      noAnimations: config.noAnimations, spellcheck: config.spellcheck, zoom: config.zoom,
-      backgroundThrottling: config.backgroundThrottling, plugins: config.plugins, panelButton: config.panelButton,
-      mod: currentMod(), injected: INJECTED
+      background: !!config.background, backgroundOpacity: config.backgroundOpacity, backgroundBlend: config.backgroundBlend,
+      noAnimations: !!config.noAnimations, blockTelemetry: !!config.blockTelemetry, zoom: config.zoom,
+      fakeMute: !!(config.fakeMute && config.fakeMute.enabled), themesEnabled: config.themesEnabled !== false,
+      profile: Object.assign({}, DEFAULTS.profile, config.profile)
     },
+    backgroundFile: findBackground(),
     themes: listThemes().map(({ css, ...t }) => t),
-    background: backgroundData(),
-    sounds: { cfg: config.sounds || {}, global: config.soundsGlobal || { volume: 1, muted: false } },
-    profile: Object.assign({}, DEFAULTS.profile, config.profile),
-    profileUrls: profileData(),
-    fakeMute: Object.assign({}, DEFAULTS.fakeMute, config.fakeMute),
     badgePresets: listBadgePresets(),
-    dataDir: dataDir()
+    profileUrls: profileData()
   };
 }
 
-function registerPanel() {
-  handle('state', async () => panelState());
+async function applyConfigChange(partial) {
+  const p = partial || {};
+  if ('background' in p) config.background = !!p.background;
+  if ('backgroundOpacity' in p) config.backgroundOpacity = Math.max(0.02, Math.min(1, Number(p.backgroundOpacity) || 0.25));
+  if ('backgroundBlend' in p) config.backgroundBlend = String(p.backgroundBlend);
+  if ('noAnimations' in p) config.noAnimations = !!p.noAnimations;
+  if ('blockTelemetry' in p) config.blockTelemetry = !!p.blockTelemetry;
+  if ('zoom' in p) config.zoom = Math.max(0.5, Math.min(2, Number(p.zoom) || 1));
+  if ('fakeMute' in p) config.fakeMute = { enabled: !!p.fakeMute };
+  if ('themesEnabled' in p) config.themesEnabled = !!p.themesEnabled;
+  if (p.profile) {
+    const prof = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
+    for (const k of ['enabled', 'displayName', 'username']) if (k in p.profile) prof[k] = k === 'enabled' ? !!p.profile[k] : String(p.profile[k]).slice(0, 64);
+    if (Array.isArray(p.profile.badges)) prof.badges = p.profile.badges;
+  }
+  saveConfig();
+  if ('background' in p || 'backgroundOpacity' in p || 'backgroundBlend' in p) await call('background', backgroundData());
+  if ('noAnimations' in p) await applyBaseCss();
+  if ('themesEnabled' in p) await applyThemes();
+  if ('zoom' in p && mainWindow) mainWindow.webContents.setZoomFactor(config.zoom);
+  if (p.profile) await call('setProfile', profileData());
+  return pageState();
+}
 
-  // ---- Themes ----
-  handle('theme-toggle', async (id, on) => { config.activeThemes[id] = !!on; saveConfig(); await applyThemes(); return true; });
-  handle('theme-preview', async (id) => makePreview(id));
-  handle('theme-import', async () => {
+const ACTIONS = {
+  async pickBackground() {
+    const f = await pickFile('Choose a video, GIF or image', ['mp4', 'webm', 'gif', 'png', 'jpg', 'jpeg', 'webp']);
+    if (!f) return pageState();
+    for (const n of BACKGROUND_NAMES) { try { fs.unlinkSync(data(n)); } catch {} }
+    fs.copyFileSync(f, data('background' + path.extname(f).toLowerCase().replace('.jpeg', '.jpg')));
+    config.background = true; saveConfig();
+    await call('background', backgroundData());
+    return pageState();
+  },
+  async toggleTheme({ id, on }) { config.activeThemes[id] = !!on; saveConfig(); await applyThemes(); return pageState(); },
+  async importTheme() {
     const f = await pickFile('Choose a theme (.css)', ['css']);
-    if (!f) return false;
-    ensureDir(data('themes'));
-    fs.copyFileSync(f, data('themes', safeName(path.basename(f))));
-    await applyThemes(); return true;
-  });
-  handle('theme-link', async (link) => {
+    if (f) { ensureDir(data('themes')); fs.copyFileSync(f, data('themes', safeName(path.basename(f)))); await applyThemes(); }
+    return pageState();
+  },
+  async addThemeLink(link) {
     link = String(link || '').trim();
-    if (!/^https:\/\/\S+$/i.test(link)) return false;
-    config.onlineThemes = Array.from(new Set([...(config.onlineThemes || []), link]));
-    saveConfig(); await applyThemes(); return true;
-  });
-  handle('theme-remove', async (id) => {
+    if (/^https:\/\/\S+$/i.test(link)) { config.onlineThemes = Array.from(new Set([...(config.onlineThemes || []), link])); saveConfig(); await applyThemes(); }
+    return pageState();
+  },
+  async removeTheme(id) {
     if (id.startsWith('link:')) config.onlineThemes = (config.onlineThemes || []).filter((l) => 'link:' + l !== id);
     else if (id.startsWith('file:')) { try { fs.unlinkSync(data('themes', path.basename(id.slice(5)))); } catch {} }
-    delete config.activeThemes[id];
-    saveConfig(); await applyThemes(); return true;
-  });
-  handle('open-folder', async (which) => {
-    const p = { themes: data('themes'), sounds: data('sounds'), data: dataDir() }[which] || dataDir();
-    ensureDir(p); shell.openPath(p); return true;
-  });
-
-  // ---- Background ----
-  handle('background', async (partial) => {
-    if ('enabled' in partial) config.background = !!partial.enabled;
-    if ('opacity' in partial) config.backgroundOpacity = Math.max(0.02, Math.min(1, Number(partial.opacity) || 0.25));
-    if ('blend' in partial) config.backgroundBlend = String(partial.blend);
-    saveConfig(); await call('background', backgroundData()); return backgroundData();
-  });
-  handle('background-pick', async () => {
-    const f = await pickFile('Choose a video, GIF or image', ['mp4', 'webm', 'gif', 'png', 'jpg', 'jpeg', 'webp']);
-    if (!f) return backgroundData();
-    for (const n of BACKGROUND_NAMES) { try { fs.unlinkSync(data(n)); } catch {} }
-    const ext = path.extname(f).toLowerCase().replace('.jpeg', '.jpg');
-    fs.copyFileSync(f, data('background' + ext));
-    config.background = true; saveConfig();
-    await call('background', backgroundData()); return backgroundData();
-  });
-
-  // ---- Sounds ----
-  handle('sounds-list', async () => (await call('listSounds')) || {});
-  handle('sound-pick', async (name) => {
-    const f = await pickFile('Choose a sound', ['mp3', 'ogg', 'wav', 'm4a', 'webm', 'flac']);
-    if (!f) return false;
-    ensureDir(data('sounds'));
-    const old = config.sounds[name]?.file;
-    if (old) { try { fs.unlinkSync(data('sounds', old)); } catch {} }
-    const file = safeName(name) + path.extname(f).toLowerCase();
-    fs.copyFileSync(f, data('sounds', file));
-    config.sounds[name] = Object.assign({ volume: 1, muted: false }, config.sounds[name], { file });
-    saveConfig(); await call('setSounds', soundsData()); return true;
-  });
-  handle('sound-config', async (name, partial) => {
-    config.sounds[name] = Object.assign({ volume: 1, muted: false }, config.sounds[name], {
-      ...('volume' in partial ? { volume: Math.max(0, Math.min(1, Number(partial.volume))) } : {}),
-      ...('muted' in partial ? { muted: !!partial.muted } : {})
-    });
-    saveConfig(); await call('setSounds', soundsData()); return true;
-  });
-  handle('sound-reset', async (name) => {
-    const file = config.sounds[name]?.file;
-    if (file) { try { fs.unlinkSync(data('sounds', file)); } catch {} }
-    delete config.sounds[name];
-    saveConfig(); await call('setSounds', soundsData()); return true;
-  });
-  handle('sounds-global', async (partial) => {
-    config.soundsGlobal = Object.assign({ volume: 1, muted: false }, config.soundsGlobal, partial);
-    config.soundsGlobal.volume = Math.max(0, Math.min(1, Number(config.soundsGlobal.volume)));
-    saveConfig(); await call('setSounds', soundsData()); return true;
-  });
-  handle('sound-url', async (name) => localUrl('sound', config.sounds[name]?.file));
-
-  // ---- Local profile ----
-  handle('profile', async (partial) => {
-    const p = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
-    for (const k of ['enabled', 'displayName', 'username']) if (k in partial) p[k] = k === 'enabled' ? !!partial[k] : String(partial[k]).slice(0, 64);
-    if (Array.isArray(partial.badges)) p.badges = partial.badges;
-    saveConfig(); await call('setProfile', profileData()); return panelState();
-  });
-  handle('profile-avatar', async (remove) => {
-    const p = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
-    if (p.avatar) { try { fs.unlinkSync(data('profile', p.avatar)); } catch {} p.avatar = ''; }
-    if (!remove) {
-      const f = await pickFile('Choose an image or GIF', ['png', 'jpg', 'jpeg', 'gif', 'webp']);
-      if (f) { ensureDir(data('profile')); p.avatar = 'avatar-' + Date.now() + path.extname(f).toLowerCase(); fs.copyFileSync(f, data('profile', p.avatar)); }
+    delete config.activeThemes[id]; saveConfig(); await applyThemes();
+    return pageState();
+  },
+  async openFolder(which) {
+    const p = { themes: data('themes'), data: dataDir() }[which] || dataDir();
+    ensureDir(p); shell.openPath(p); return pageState();
+  },
+  async pickAvatar() {
+    const prof = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
+    const f = await pickFile('Choose an image or GIF', ['png', 'jpg', 'jpeg', 'gif', 'webp']);
+    if (f) {
+      if (prof.avatar) { try { fs.unlinkSync(data('profile', prof.avatar)); } catch {} }
+      ensureDir(data('profile')); prof.avatar = 'avatar-' + Date.now() + path.extname(f).toLowerCase();
+      fs.copyFileSync(f, data('profile', prof.avatar)); saveConfig(); await call('setProfile', profileData());
     }
-    saveConfig(); await call('setProfile', profileData()); return panelState();
-  });
-  handle('badge-custom', async (name) => {
+    return pageState();
+  },
+  async resetAvatar() {
+    const prof = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
+    if (prof.avatar) { try { fs.unlinkSync(data('profile', prof.avatar)); } catch {} prof.avatar = ''; }
+    saveConfig(); await call('setProfile', profileData()); return pageState();
+  },
+  async addCustomBadge(name) {
     const f = await pickFile('Choose the badge image', ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
-    if (!f) return panelState();
-    ensureDir(data('profile'));
-    const file = 'badge-' + Date.now() + path.extname(f).toLowerCase();
-    fs.copyFileSync(f, data('profile', file));
-    const p = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
-    p.badges = [...(p.badges || []), { name: String(name || 'My badge').slice(0, 60), file }];
-    saveConfig(); await call('setProfile', profileData()); return panelState();
-  });
-
-  // ---- Plugins ----
-  handle('plugins-list', async () => (await call('listPlugins')) || null);
-  handle('plugins-toggle', async (names, on) => (await call('togglePlugins', names, on)) || null);
-  handle('reload', async () => { if (mainWindow) mainWindow.reload(); return true; });
-
-  // ---- Fake mute ----
-  handle('fake-mute', async (enabled) => {
-    config.fakeMute = { enabled: !!enabled };
-    saveConfig();
-    await call('fakeMuteConfig', config.fakeMute);
-    return config.fakeMute;
-  });
-
-  // ---- Custom CSS ----
-  handle('css-read', async () => readText('custom.css'));
-  handle('css-save', async (text) => { fs.writeFileSync(data('custom.css'), String(text)); await applyBaseCss(); return true; });
-
-  // ---- Settings ----
-  handle('config', async (partial) => {
-    const allowed = ['hardwareAcceleration', 'blockTelemetry', 'noAnimations', 'spellcheck', 'zoom', 'backgroundThrottling', 'plugins', 'panelButton'];
-    for (const k of allowed) if (k in partial) config[k] = k === 'zoom' ? Math.max(0.5, Math.min(2, Number(partial[k]) || 1)) : !!partial[k];
-    if ('mod' in partial && MODS[partial.mod]) config.mod = partial.mod;
-    saveConfig();
-    if (mainWindow) {
-      if ('zoom' in partial) mainWindow.webContents.setZoomFactor(config.zoom);
-      if ('noAnimations' in partial) await applyBaseCss();
-      if ('panelButton' in partial) await call('panelButton', config.panelButton);
+    if (f) {
+      ensureDir(data('profile'));
+      const file = 'badge-' + Date.now() + path.extname(f).toLowerCase();
+      fs.copyFileSync(f, data('profile', file));
+      const prof = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);
+      prof.badges = [...(prof.badges || []), { name: String(name || 'My badge').slice(0, 60), file }];
+      saveConfig(); await call('setProfile', profileData());
     }
-    return true;
+    return pageState();
+  },
+  async restart() { app.relaunch(); app.exit(0); }
+};
+
+function registerPageIpc() {
+  handlePage('state', async () => pageState());
+  handlePage('set', async (partial) => applyConfigChange(partial));
+  handlePage('action', async (name, arg) => {
+    if (!Object.prototype.hasOwnProperty.call(ACTIONS, name)) throw new Error('unknown action');
+    return ACTIONS[name](arg);
   });
-  handle('restart', async () => { app.relaunch(); app.exit(0); });
 }
 
 // ============================================================
@@ -651,9 +550,9 @@ function startWhenReady() {
   if (started) return;
   started = true;
   setupSession();
-  registerPanel();
+  registerPageIpc();
   watchThemes();
   if (config.plugins) updateMod();
 }
 
-module.exports = { config, attachWindow, startWhenReady, originalPreloads, openPanel, DISCORD_URL };
+module.exports = { config, attachWindow, startWhenReady, originalPreloads, DISCORD_URL };

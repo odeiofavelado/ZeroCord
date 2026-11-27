@@ -17,20 +17,18 @@
 
 ## Features
 
-| | |
-|---|---|
-| **Plugins** | 370+ plugins powered by [Equicord](https://github.com/Equicord/Equicord), with curated packs, search and one-click toggles. Vencord is available as an alternative engine. |
-| **Control panel** | A settings panel styled after Discord's own. Open it from the ✦ button in Discord's top bar. |
-| **Themes** | Six built-in themes, live previews, and support for any `.css` theme file or link. |
-| **Animated background** | Use any video, GIF or image as your Discord background, with adjustable intensity and blend modes. |
-| **Custom sounds** | Replace, rebalance or mute any Discord sound individually. |
-| **Profile & badges** | Change your display name, username, avatar and badges locally. Only you see these changes. |
-| **Fake Mute plugin** | Optional plugin that adds a button next to your mic and headphones. When on, others in the call see you as muted while your microphone keeps working. |
-| **Seamless install** | Installs into the official Discord Stable, PTB and Canary clients and survives Discord updates. |
+Everything lives inside Discord's own settings, under **ZeroCord Settings → Plugins**. ZeroCord's plugins carry the ZeroCord badge and keep their options under the ⚙ cog.
 
-<div align="center">
-<img src=".github/assets/panel.png" width="720" alt="ZeroCord control panel">
-</div>
+| Plugin | What it does |
+|---|---|
+| **370+ Equicord plugins** | The full [Equicord](https://github.com/Equicord/Equicord) catalog, ready to toggle. |
+| **FakeMute** | Adds a button next to your mic and headphones. When on, others in the call see you as muted while your microphone keeps working. |
+| **AnimatedBackground** | Use any video, GIF or image as your Discord background, with adjustable intensity and blend mode. |
+| **ZeroCordThemes** | Six built-in themes plus any `.css` theme file or link, toggled individually. |
+| **LocalProfile** | Change your display name, username, avatar and badges. Only you see these changes. |
+| **Performance** | Fewer animations, blocked telemetry and interface zoom. |
+
+ZeroCord also installs into the official Discord **Stable, PTB and Canary** clients, stays installed across Discord updates and can give Discord a Zero Two icon.
 
 ## Installation
 
@@ -66,9 +64,11 @@ npm start
 
 ## Usage
 
-- Click the **✦** button in Discord's top bar to open the ZeroCord panel.
-- Turn plugins on or off in **Plugins**. ZeroCord's own plugins (like **FakeMute**) are listed at the top.
-- Your settings, themes, sounds and profile files are stored in `%APPDATA%\ZeroCord`. Drop any `.css` file into the `themes` folder there and it's applied instantly.
+1. Open Discord **Settings** and scroll to **ZeroCord Settings**.
+2. Open **Plugins** and turn on what you want. Use the ⚙ cog on a plugin to change its options.
+3. For custom sounds and CSS, use Equicord's **CustomSounds** plugin and **QuickCSS**.
+
+Your ZeroCord files (background, themes, profile pictures) are stored in `%APPDATA%\ZeroCord`. Drop any `.css` file into its `themes` folder and it shows up in **ZeroCordThemes**.
 
 ## Building
 
@@ -83,12 +83,11 @@ Pushing a `v*` tag builds the installer on GitHub Actions and publishes it as a 
 
 ```
 src/
-├── core.js          Shared core: config, themes, panel IPC, plugin engine
+├── core.js          Shared core: config, themes, settings IPC, plugin engine
 ├── patcher.js       Entry point inside the official Discord client
 ├── standalone.js    Entry point for the standalone app
 ├── preload.js       Injects the plugin engine before Discord loads
-├── runtime.js       In-page features: background, sounds, profile, FakeMute, buttons
-├── panel/           The control panel UI
+├── runtime.js       In-page features and ZeroCord's plugins inside Discord's settings
 ├── themes/          Built-in themes
 └── vendor/          Bundled Equicord / Vencord builds
 installer/           The installer app

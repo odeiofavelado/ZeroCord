@@ -94,12 +94,11 @@ function draw() {
 
 const chosen = () => clients.filter((c) => selected.has(c.id)).map((c) => c.id);
 
+// Closes any selected Discord that's running, without asking
 async function closeIfRunning(ids) {
   const running = await installer.running(ids);
   if (!running.length) return true;
   const names = clients.filter((c) => running.includes(c.id)).map((c) => c.name).join(', ');
-  const r = await installer.confirm('Discord is running', `${names} needs to be closed to continue. Close it now?`, ['Close and continue', 'Cancel']);
-  if (r !== 0) return false;
   log('Closing ' + names + '…');
   await installer.closeClients(running);
   return true;
@@ -122,10 +121,10 @@ $('#install').onclick = async () => {
     if (r === 2) return;
     replaceOtherMods = r === 0;
   }
-  if (!(await closeIfRunning(ids))) return;
   lock(true);
   $('#log').replaceChildren();
   setState('working', 'Hang on, darling… setting everything up for you.');
+  await closeIfRunning(ids);
   const r = await installer.install(ids, { zeroTwoIcon: $('#opt-icon').checked, replaceOtherMods });
   await settle();
   clients = r.list;
@@ -146,10 +145,10 @@ $('#uninstall').onclick = async () => {
   if (!ids.length) return;
   const r = await installer.confirm('Uninstall ZeroCord?', 'Discord goes back to normal, with its original icon.', ['Uninstall and keep my settings', 'Uninstall and delete everything', 'Cancel']);
   if (r === 2) return;
-  if (!(await closeIfRunning(ids))) return;
   lock(true);
   $('#log').replaceChildren();
   setState('working', 'Alright… removing everything carefully.');
+  await closeIfRunning(ids);
   const res = await installer.uninstall(ids, { deleteData: r === 1 });
   await settle();
   clients = res.list;

@@ -148,7 +148,15 @@
   // ==========================================================
   //  Fake mute: people in the call see you muted, but you keep talking
   // ==========================================================
-  const FM = (Z._fakeMute = { cfg: { enabled: false }, active: false, socket: null, originalSend: null, last: null, timer: null });
+  const FM = (Z._fakeMute = { cfg: { enabled: false, deafen: true }, active: false, socket: null, originalSend: null, last: null, timer: null });
+  const zlog = (...a) => { try { window.ZeroCordNative && window.ZeroCordNative.log && window.ZeroCordNative.log(a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); } catch {} };
+
+  // Called by Discord's own voice-state code (patched in the preload)
+  window.__zcVoiceHits = 0;
+  window.__zcVoice = {
+    mute: (v) => { window.__zcVoiceHits++; return FM.active ? true : v; },
+    deaf: (v) => (FM.active && FM.cfg.deafen ? true : v)
+  };
   const getSocket = () => { const ws = findProps('getSocket'); try { return ws && ws.getSocket(); } catch { return null; } };
 
   // Intercepts the "voice state" update (op 4) sent to Discord's gateway
@@ -163,7 +171,7 @@
     s.send = function (op, payload, ...rest) {
       if (op === 4 && payload && typeof payload === 'object') {
         FM.last = Object.assign({}, payload);
-        if (FM.active) payload = Object.assign({}, payload, { self_mute: true });
+        if (FM.active) payload = Object.assign({}, payload, { self_mute: true }, FM.cfg.deafen ? { self_deaf: true } : {});
       }
       return original.call(this, op, payload, ...rest);
     };
@@ -184,7 +192,8 @@
       self_deaf: !!(media && media.isDeaf && media.isDeaf()), self_video: false, flags: 0
     };
     const reallyMuted = !!(media && media.isMute && media.isMute());
-    s.send(4, Object.assign({}, base, { self_mute: FM.active ? true : reallyMuted }));
+    const reallyDeaf = !!(media && media.isDeaf && media.isDeaf());
+    s.send(4, Object.assign({}, base, { self_mute: FM.active ? true : reallyMuted, self_deaf: FM.active && FM.cfg.deafen ? true : reallyDeaf }));
     return true;
   }
 
@@ -212,13 +221,35 @@
     return { active: FM.active, enabled: FM.cfg.enabled, inCall: !!(selected && selected.getVoiceChannelId && selected.getVoiceChannelId()) };
   };
 
+  // Makes Discord send its voice state again, so the patched values reach the server
+  function refreshVoiceState() {
+    const selected = findProps('getVoiceChannelId');
+    const channelId = selected && selected.getVoiceChannelId && selected.getVoiceChannelId();
+    if (!channelId) return { inCall: false };
+    const before = window.__zcVoiceHits;
+    const actions = findProps('selectVoiceChannel', 'selectChannel') || findProps('selectVoiceChannel');
+    let via = 'none';
+    try { if (actions && actions.selectVoiceChannel) { actions.selectVoiceChannel(channelId); via = 'selectVoiceChannel'; } } catch (e) { zlog('fakeMute selectVoiceChannel failed', String(e)); }
+    // If Discord's voice code didn't go through the patch, send the state on the gateway ourselves
+    setTimeout(() => {
+      const patched = window.__zcVoiceHits > before;
+      if (!patched) {
+        wrapSocket();
+        const sent = resendVoiceState();
+        zlog('fakeMute fallback socket', { sent, socket: !!getSocket() });
+      }
+      zlog('fakeMute refresh', { active: FM.active, deafen: FM.cfg.deafen, via, patched });
+    }, 1200);
+    return { inCall: true };
+  }
+
   Z.fakeMuteToggle = (force) => {
     if (!FM.cfg.enabled && force !== false) return Z.fakeMuteState();
     FM.active = typeof force === 'boolean' ? force : !FM.active;
     wrapSocket();
-    const inCall = resendVoiceState();
+    const { inCall } = refreshVoiceState();
     notify();
-    toast(FM.active ? 'Fake Mute on: you look muted' : 'Fake Mute off', FM.active);
+    toast(FM.active ? (FM.cfg.deafen ? 'Fake Mute on: you look muted and deafened' : 'Fake Mute on: you look muted') : 'Fake Mute off', FM.active);
     return Object.assign(Z.fakeMuteState(), { inCall });
   };
 
@@ -240,7 +271,7 @@
     R.useEffect(() => { FM.listeners.add(rerender); return () => FM.listeners.delete(rerender); }, []);
     const Button = V().Api.UserArea.UserAreaButton;
     return h(Button, {
-      tooltipText: FM.active ? 'Turn off Fake Mute' : 'Turn on Fake Mute',
+      tooltipText: FM.active ? 'Turn off Fake Mute' : (FM.cfg.deafen ? 'Fake Mute + Deafen' : 'Fake Mute'),
       icon: FakeMuteIcon,
       role: 'switch',
       'aria-checked': FM.active,
@@ -262,7 +293,7 @@
   }
 
   Z.fakeMuteConfig = (cfg) => {
-    FM.cfg = Object.assign({ enabled: false }, cfg || {});
+    FM.cfg = Object.assign({ enabled: false, deafen: true }, cfg || {});
     if (!FM.cfg.enabled && FM.active) Z.fakeMuteToggle(false);
     setFakeMuteButton(FM.cfg.enabled);
     syncPlugin('FakeMute', FM.cfg.enabled);
@@ -382,11 +413,17 @@
 
   const PLUGINS = {
     FakeMute: {
-      description: 'Appear muted to others in a call while your microphone keeps working. Adds a button next to your mic and headphones.',
+      description: 'Look muted (and deafened) to everyone in the call while you keep talking and listening. Adds a button next to your mic and headphones.',
       tags: ['Voice', 'Utility'],
       dependencies: ['UserAreaAPI'],
       enabled: (c) => c.fakeMute,
-      setEnabled: (on) => { Z.fakeMuteConfig({ enabled: on }); save({ fakeMute: on }); }
+      setEnabled: (on) => { Z.fakeMuteConfig({ enabled: on, deafen: FM.cfg.deafen }); save({ fakeMute: on }); },
+      settings: (c) => ({
+        deafen: {
+          type: OPT.BOOLEAN, description: 'Also appear deafened (you can still hear everyone)', default: c.fakeDeafen !== false,
+          onChange: (v) => { FM.cfg.deafen = !!v; save({ fakeDeafen: !!v }); notify(); if (FM.active) refreshVoiceState(); }
+        }
+      })
     },
     AnimatedBackground: {
       description: 'Use any video, GIF or image as your Discord background.',

@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('ZeroCordNative', {
   // ZeroCord settings shown in Discord's settings (Plugins page)
   state: () => ipcRenderer.invoke('zc:state'),
   set: (partial) => ipcRenderer.invoke('zc:set', partial),
-  action: (name, arg) => ipcRenderer.invoke('zc:action', name, arg)
+  action: (name, arg) => ipcRenderer.invoke('zc:action', name, arg),
+  log: (msg) => ipcRenderer.send('zc:log', String(msg).slice(0, 2000))
 });
 
 let modCode = ipcRenderer.sendSync('zc:mod-code');
@@ -46,6 +47,20 @@ if (modCode) {
 `;
   const tail = `
   try { if (typeof Vencord !== 'undefined' && !window.Vencord) window.Vencord = Vencord; } catch (e) {}
+  // FakeMute: the voice state Discord sends (self_mute / self_deaf) goes through ZeroCord first.
+  // Registered before Discord's code loads; without ZeroCord's runtime it passes values through untouched.
+  try {
+    if (window.Vencord && window.Vencord.Plugins && window.Vencord.Plugins.addPatch) {
+      window.Vencord.Plugins.addPatch({
+        find: /self_mute:[^,]{1,40},self_deaf:[^,]{1,40},self_video:/,
+        all: true,
+        replacement: {
+          match: /self_mute:([^,]{1,40}),self_deaf:([^,]{1,40}),self_video:/,
+          replace: "self_mute:(window.__zcVoice?window.__zcVoice.mute($1):$1),self_deaf:(window.__zcVoice?window.__zcVoice.deaf($2):$2),self_video:"
+        }
+      }, "FakeMute");
+    }
+  } catch (e) { console.warn('[ZeroCord] voice patch', e); }
 })();`;
   webFrame.executeJavaScript(head + modCode + tail).catch((e) => console.error('[ZeroCord] failed to load the plugin engine', e));
 }

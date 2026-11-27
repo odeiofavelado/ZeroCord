@@ -65,7 +65,7 @@ const DEFAULTS = {
   onlineThemes: [],
   activeThemes: {},
   profile: { enabled: false, displayName: '', username: '', avatar: '', badges: [] },
-  fakeMute: { enabled: false },
+  fakeMute: { enabled: false, deafen: true },
   zeroTwoIcon: true,
   themesEnabled: true
 };
@@ -175,6 +175,8 @@ async function updateMod() {
 ipcMain.on('zc:mod-code', (e) => {
   e.returnValue = config.plugins && isDiscord(senderUrl(e)) ? readModCode() : '';
 });
+
+ipcMain.on('zc:log', (e, msg) => { if (isDiscord(senderUrl(e))) log('[page]', msg); });
 
 ipcMain.handle('zc:fetch', async (e, url, options = {}) => {
   if (!isDiscord(senderUrl(e))) throw new Error('origin not allowed');
@@ -473,7 +475,8 @@ function pageState() {
     config: {
       background: !!config.background, backgroundOpacity: config.backgroundOpacity, backgroundBlend: config.backgroundBlend,
       noAnimations: !!config.noAnimations, blockTelemetry: !!config.blockTelemetry, zoom: config.zoom,
-      fakeMute: !!(config.fakeMute && config.fakeMute.enabled), themesEnabled: config.themesEnabled !== false,
+      fakeMute: !!(config.fakeMute && config.fakeMute.enabled), fakeDeafen: !(config.fakeMute && config.fakeMute.deafen === false),
+      themesEnabled: config.themesEnabled !== false,
       profile: Object.assign({}, DEFAULTS.profile, config.profile)
     },
     backgroundFile: findBackground(),
@@ -491,7 +494,8 @@ async function applyConfigChange(partial) {
   if ('noAnimations' in p) config.noAnimations = !!p.noAnimations;
   if ('blockTelemetry' in p) config.blockTelemetry = !!p.blockTelemetry;
   if ('zoom' in p) config.zoom = Math.max(0.5, Math.min(2, Number(p.zoom) || 1));
-  if ('fakeMute' in p) config.fakeMute = { enabled: !!p.fakeMute };
+  if ('fakeMute' in p) config.fakeMute = Object.assign({}, config.fakeMute, { enabled: !!p.fakeMute });
+  if ('fakeDeafen' in p) config.fakeMute = Object.assign({}, config.fakeMute, { deafen: !!p.fakeDeafen });
   if ('themesEnabled' in p) config.themesEnabled = !!p.themesEnabled;
   if (p.profile) {
     const prof = config.profile = Object.assign({}, DEFAULTS.profile, config.profile);

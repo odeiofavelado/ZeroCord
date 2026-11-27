@@ -22,7 +22,7 @@ Everything lives inside Discord's own settings, under **ZeroCord Settings → Pl
 | Plugin | What it does |
 |---|---|
 | **370+ Equicord plugins** | The full [Equicord](https://github.com/Equicord/Equicord) catalog, ready to toggle. |
-| **FakeMute** | Adds a button next to your mic and headphones. When on, others in the call see you as muted while your microphone keeps working. |
+| **FakeMute** | Adds a button next to your mic and headphones. When on, everyone in the call sees you as muted (and optionally deafened) while you keep talking and listening. |
 | **AnimatedBackground** | Use any video, GIF or image as your Discord background, with adjustable intensity and blend mode. |
 | **ZeroCordThemes** | Six built-in themes plus any `.css` theme file or link, toggled individually. |
 | **LocalProfile** | Change your display name, username, avatar and badges. Only you see these changes. |

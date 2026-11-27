@@ -92,9 +92,10 @@ function migrateLegacyFolder(log) {
 function copyFiles(log) {
   migrateLegacyFolder(log);
   const target = CODE_DIR();
-  fs.rmSync(target, { recursive: true, force: true });
+  // Replace the old files; if something keeps the folder busy, overwrite them in place
+  try { fs.rmSync(target, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); } catch {}
   fs.mkdirSync(target, { recursive: true });
-  fs.cpSync(SRC_DIR, target, { recursive: true });
+  fs.cpSync(SRC_DIR, target, { recursive: true, force: true });
   log('ZeroCord files copied');
 }
 
@@ -309,8 +310,13 @@ async function uninstall(ids, options = {}, log = () => {}) {
   }
   await setShortcutIcons(targets, false, log);
   if (options.deleteData && !list().some((v) => v.installed)) {
-    fs.rmSync(DATA_DIR(), { recursive: true, force: true });
-    log('Your ZeroCord settings were deleted');
+    try {
+      fs.rmSync(DATA_DIR(), { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
+      log('Your ZeroCord settings were deleted');
+    } catch (e) {
+      log(`⚠ Discord is back to normal, but the settings folder couldn't be deleted because it's in use. ` +
+        `Close any window showing ${DATA_DIR()} and try again, or delete it yourself.`);
+    }
   }
   return list();
 }

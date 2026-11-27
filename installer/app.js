@@ -55,14 +55,9 @@ const STATE_LABEL = { installed: 'Installed', clean: 'Not installed' };
 const stateLabel = (c) => STATE_LABEL[c.state] || (c.mod ? `${c.mod} installed` : 'Other mod');
 let clients = [];
 const selected = new Set();
-let firstLoad = true;
 
 async function load() {
-  clients = await installer.list();
-  if (firstLoad) {
-    clients.forEach((c) => selected.add(c.id));
-    firstLoad = false;
-  }
+  clients = await installer.list(); // nothing is pre-selected: you choose
   draw();
 }
 
